@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>BidMart Auth - Initial Integration</title>
+</head>
+<body>
+<h2>Test Registrasi User (Frontend -> Backend -> Supabase)</h2>
+
+<form action="/dummy/register" method="POST">
+    <input type="text" name="nama" placeholder="Masukkan Nama Kamu" required>
+    <button type="submit">Daftar</button>
+</form>
+
+<hr>
+<h3>Daftar User di Database:</h3>
+<ul>
+    <li th:each="user : ${users}">
+        ID: <span th:text="${user.id}"></span> | Nama: <span th:text="${user.nama}"></span>
+    </li>
+</ul>
+</body>
+</html>
