@@ -45,6 +45,8 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.11.5")
     implementation("dev.samstevens.totp:totp:1.7.1")
     testImplementation("com.h2database:h2")
+    runtimeOnly("com.h2database:h2")
+    implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
 }
 
 tasks.withType<Test> {
@@ -58,5 +60,12 @@ tasks.jacocoTestReport {
         xml.required.set(true)
         csv.required.set(false)
         html.required.set(false)
+    }
+}
+
+sonar {
+    properties {
+        property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
+        property("sonar.coverage.exclusions", "**/config/**, **/model/**, **/*Application.java")
     }
 }
