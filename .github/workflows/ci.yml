@@ -60,20 +60,19 @@ jobs:
             -Dsonar.junit.reportPaths=build/test-results/test
             -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml
 
-  dummy-deployment:
-    name: Dummy CD Deployment
+
+  heroku-deployment:
+    name: Deploy to Heroku
     needs: build-test-lint-sonar
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Simulate Deployment Process
-        run: |
-          echo "CI passed successfully! Code quality check passed. Memulai proses deployment..."
-          
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            echo "Deploying to PRODUCTION environment (Dummy)..."
-          elif [ "${{ github.ref }}" == "refs/heads/staging" ]; then
-            echo "Deploying to STAGING environment (Dummy)..."
-          fi
-          
-          echo "Dummy Deployment selesai!"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Heroku
+        uses: akhileshns/heroku-deploy@v3.13.15
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "bidmart-auth-service"
+          heroku_email: "aaronsuhaendi@gmail.com"
