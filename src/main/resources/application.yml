@@ -10,6 +10,11 @@ spring:
       ddl-auto: update
     open-in-view: false
 
+jwt:
+  secret: ${JWT_SECRET:BidMartSuperSecretKeyForAuthenticationAdvProg2026PalingAmanDiDunia}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
 staging:
   links:
     frontend-url: ${FRONTEND_STAGING_URL:not-set}
