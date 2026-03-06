@@ -59,13 +59,13 @@ tasks.jacocoTestReport {
     reports {
         xml.required.set(true)
         csv.required.set(false)
-        html.required.set(false)
+        html.required.set(true)
     }
 }
 
 sonar {
     properties {
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
-        property("sonar.coverage.exclusions", "**/config/**, **/model/**, **/*Application.java")
+        property("sonar.coverage.exclusions", "**/config/**, **/model/**, **/dto/**, **/*Application.java, **/*Initializer.java, **/DummyUser.java")
     }
 }
