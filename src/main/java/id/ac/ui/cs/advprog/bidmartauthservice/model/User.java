@@ -30,6 +30,17 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "bio")
+    private String bio;
+
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
