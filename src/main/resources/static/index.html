@@ -87,11 +87,13 @@
 
             if (response.ok) {
                 const data = await response.json();
-                resultDiv.innerHTML = `
-                        <span style="color: green;">Login Berhasil!</span>
-                        <p><strong>Access Token:</strong></p>
-                        <pre>${data.accessToken}</pre>
-                    `;
+
+                localStorage.setItem('token', data.accessToken);
+
+                resultDiv.innerHTML = `<span style="color: green;">Login Berhasil! Mengalihkan ke profil...</span>`;
+                setTimeout(() => {
+                    window.location.href = '/profile.html';
+                }, 1000);
             } else {
                 resultDiv.innerHTML = `<span style="color: red;">Email atau password salah!</span>`;
             }
