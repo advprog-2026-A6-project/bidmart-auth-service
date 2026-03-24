@@ -20,6 +20,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import id.ac.ui.cs.advprog.bidmartauthservice.service.JwtService;
+import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
+
 @WebMvcTest(controllers = AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
@@ -29,6 +32,12 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private JwtService jwtService;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
