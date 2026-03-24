@@ -66,6 +66,6 @@ tasks.jacocoTestReport {
 sonar {
     properties {
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/jacoco/test/jacocoTestReport.xml")
-        property("sonar.coverage.exclusions", "**/config/**, **/model/**, **/dto/**, **/*Application.java, **/*Initializer.java, **/DummyUser.java")
+        property("sonar.coverage.exclusions", "**/config/**, **/model/**, **/dto/**, **/*Application.java, **/*Initializer.java, **/DummyUser.java, **/static/**, **/*.html")
     }
 }
