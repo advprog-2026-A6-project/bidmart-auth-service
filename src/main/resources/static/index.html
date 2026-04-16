@@ -10,13 +10,12 @@
         input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         button { width: 100%; padding: 10px; background-color: #0056b3; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background-color: #004494; }
-        .result { margin-top: 15px; font-size: 0.9em; word-wrap: break-word; }
-        pre { background-color: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 0.8em; }
+        .result { margin-top: 15px; font-size: 0.9em; word-wrap: break-word; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="card">
+<div class="card" id="registerCard">
     <h3>Daftar Akun Baru</h3>
     <form id="registerForm">
         <input type="text" id="regName" placeholder="Nama Lengkap" required>
@@ -27,7 +26,7 @@
     <div id="regResult" class="result"></div>
 </div>
 
-<div class="card">
+<div class="card" id="loginCard">
     <h3>Login</h3>
     <form id="loginForm">
         <input type="email" id="loginEmail" placeholder="Email" required>
@@ -37,7 +36,19 @@
     <div id="loginResult" class="result"></div>
 </div>
 
+<div class="card" id="mfaCard" style="display: none; border: 2px solid #28a745;">
+    <h3 style="color: #28a745; text-align: center;">Verifikasi 2FA</h3>
+    <p style="font-size: 0.85em; color: #555; text-align: center;">Masukkan 6 digit angka dari aplikasi Authenticator Anda.</p>
+    <form id="mfaForm">
+        <input type="text" id="mfaCode" placeholder="Kode 6 Digit" required maxlength="6" style="text-align: center; font-size: 1.2em; letter-spacing: 2px;">
+        <button type="submit" style="background-color: #28a745;">Verifikasi & Masuk</button>
+    </form>
+    <div id="mfaResult" class="result"></div>
+</div>
+
 <script>
+    let tempEmailForMfa = "";
+
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const resultDiv = document.getElementById('regResult');
@@ -88,14 +99,47 @@
             if (response.ok) {
                 const data = await response.json();
 
-                localStorage.setItem('token', data.accessToken);
-
-                resultDiv.innerHTML = `<span style="color: green;">Login Berhasil! Mengalihkan ke profil...</span>`;
-                setTimeout(() => {
+                if (data.mfaRequired) {
+                    tempEmailForMfa = payload.email;
+                    document.getElementById('loginCard').style.display = 'none';
+                    document.getElementById('mfaCard').style.display = 'block';
+                } else {
+                    localStorage.setItem('token', data.accessToken);
+                    resultDiv.innerHTML = `<span style="color: green;">Login Berhasil!</span>`;
                     window.location.href = '/profile.html';
-                }, 1000);
+                }
             } else {
                 resultDiv.innerHTML = `<span style="color: red;">Email atau password salah!</span>`;
+            }
+        } catch (error) {
+            resultDiv.innerHTML = `<span style="color: red;">Gagal terhubung ke server.</span>`;
+        }
+    });
+
+    document.getElementById('mfaForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const resultDiv = document.getElementById('mfaResult');
+        resultDiv.innerHTML = "Memverifikasi...";
+
+        const payload = {
+            email: tempEmailForMfa,
+            code: document.getElementById('mfaCode').value
+        };
+
+        try {
+            const response = await fetch('/api/auth/verify-2fa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.accessToken);
+                resultDiv.innerHTML = `<span style="color: green;">Verifikasi Sukses!</span>`;
+                setTimeout(() => { window.location.href = '/profile.html'; }, 1000);
+            } else {
+                resultDiv.innerHTML = `<span style="color: red;">Kode OTP Salah / Kedaluwarsa!</span>`;
             }
         } catch (error) {
             resultDiv.innerHTML = `<span style="color: red;">Gagal terhubung ke server.</span>`;
