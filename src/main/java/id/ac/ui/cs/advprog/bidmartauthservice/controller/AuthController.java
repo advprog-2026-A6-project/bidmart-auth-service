@@ -3,6 +3,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.controller;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.RegisterRequest;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.Verify2faRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,5 +29,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/verify-2fa")
+    public ResponseEntity<AuthResponse> verify2fa(@RequestBody Verify2faRequest request) {
+        return ResponseEntity.ok(authService.verify2fa(request.getEmail(), request.getCode()));
     }
 }

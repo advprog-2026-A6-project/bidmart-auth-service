@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.RegisterRequest;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.Verify2faRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -82,7 +84,7 @@ class AuthControllerTest {
 
     @Test
     void testLoginEndpointSuccess() throws Exception {
-        AuthResponse response = new AuthResponse("access_token", "refresh_token");
+        AuthResponse response = new AuthResponse("access_token", "refresh_token", false);
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/auth/login")
@@ -90,6 +92,23 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access_token"))
-                .andExpect(jsonPath("$.refreshToken").value("refresh_token"));
+                .andExpect(jsonPath("$.refreshToken").value("refresh_token"))
+                .andExpect(jsonPath("$.mfaRequired").value(false));
+    }
+
+    @Test
+    void testVerify2faEndpointSuccess() throws Exception {
+        Verify2faRequest request = new Verify2faRequest("aaron@test.com", "123456");
+        AuthResponse response = new AuthResponse("access_token", "refresh_token", false);
+
+        when(authService.verify2fa(anyString(), anyString())).thenReturn(response);
+
+        mockMvc.perform(post("/api/auth/verify-2fa")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("access_token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh_token"))
+                .andExpect(jsonPath("$.mfaRequired").value(false));
     }
 }

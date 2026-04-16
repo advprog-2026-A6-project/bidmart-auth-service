@@ -8,4 +8,5 @@ import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 public interface AuthService {
     User register(RegisterRequest request);
     AuthResponse login(LoginRequest request);
+    AuthResponse verify2fa(String email, String code);
 }

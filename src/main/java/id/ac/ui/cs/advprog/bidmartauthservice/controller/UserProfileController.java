@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -23,10 +24,26 @@ public class UserProfileController {
     }
 
     @PutMapping
-    public ResponseEntity<ProfileResponseDto> updateProfile(
-            Principal principal,
-            @RequestBody ProfileUpdateDto updateDto) {
+    public ResponseEntity<ProfileResponseDto> updateProfile(Principal principal, @RequestBody ProfileUpdateDto updateDto) {
         ProfileResponseDto updatedProfile = userProfileService.updateProfile(principal.getName(), updateDto);
         return ResponseEntity.ok(updatedProfile);
+    }
+
+    @GetMapping("/2fa/generate")
+    public ResponseEntity<?> generate2faQrCode(Principal principal) {
+        String qrCodeUri = userProfileService.generate2faQrCode(principal.getName());
+        return ResponseEntity.ok(Map.of("qrCodeUri", qrCodeUri));
+    }
+
+    @PostMapping("/2fa/enable")
+    public ResponseEntity<?> enable2fa(Principal principal, @RequestBody Map<String, String> request) {
+        String code = request.get("code");
+        boolean isEnabled = userProfileService.enable2fa(principal.getName(), code);
+
+        if (isEnabled) {
+            return ResponseEntity.ok(Map.of("message", "2FA berhasil diaktifkan!"));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("error", "Kode OTP salah atau kedaluwarsa. Silakan coba lagi."));
+        }
     }
 }
