@@ -25,6 +25,9 @@ class UserProfileServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private TwoFactorAuthService twoFactorAuthService;
+
     @InjectMocks
     private UserProfileService userProfileService;
 
@@ -41,6 +44,7 @@ class UserProfileServiceTest {
                 .address("Jl. Testing No. 1")
                 .bio("I am a tester")
                 .profilePictureUrl("https://example.com/pic.jpg")
+                .isTwoFactorEnabled(false)
                 .build();
     }
 
@@ -54,6 +58,7 @@ class UserProfileServiceTest {
         assertEquals(dummyUser.getEmail(), response.getEmail());
         assertEquals(dummyUser.getName(), response.getName());
         assertEquals(dummyUser.getPhoneNumber(), response.getPhoneNumber());
+        assertFalse(response.isTwoFactorEnabled());
 
         verify(userRepository, times(1)).findByEmail("test@example.com");
     }
@@ -88,6 +93,7 @@ class UserProfileServiceTest {
         assertEquals("Jl. Baru No. 2", response.getAddress());
         assertEquals("Updated bio", response.getBio());
         assertEquals("https://example.com/newpic.jpg", response.getProfilePictureUrl());
+        assertFalse(response.isTwoFactorEnabled());
 
         verify(userRepository, times(1)).save(any(User.class));
     }
@@ -102,5 +108,75 @@ class UserProfileServiceTest {
         });
 
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testGenerate2faQrCode_Success() {
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+        when(twoFactorAuthService.generateNewSecret()).thenReturn("SECRET_KEY");
+        when(twoFactorAuthService.generateQrCodeImageUri("SECRET_KEY", dummyUser.getEmail())).thenReturn("data:image/png;base64,...");
+
+        String qrCodeUri = userProfileService.generate2faQrCode("test@example.com");
+
+        assertNotNull(qrCodeUri);
+        assertEquals("data:image/png;base64,...", qrCodeUri);
+        assertEquals("SECRET_KEY", dummyUser.getTwoFactorSecret());
+        verify(userRepository, times(1)).save(dummyUser);
+    }
+
+    @Test
+    void testGenerate2faQrCode_UserNotFound() {
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+        assertThrows(UsernameNotFoundException.class, () -> {
+            userProfileService.generate2faQrCode("unknown@example.com");
+        });
+    }
+
+    @Test
+    void testEnable2fa_Success() {
+        dummyUser.setTwoFactorSecret("SECRET_KEY");
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+        when(twoFactorAuthService.isOtpValid("SECRET_KEY", "123456")).thenReturn(true);
+
+        boolean result = userProfileService.enable2fa("test@example.com", "123456");
+
+        assertTrue(result);
+        assertTrue(dummyUser.isTwoFactorEnabled());
+        verify(userRepository, times(1)).save(dummyUser);
+    }
+
+    @Test
+    void testEnable2fa_InvalidCode() {
+        dummyUser.setTwoFactorSecret("SECRET_KEY");
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+        when(twoFactorAuthService.isOtpValid("SECRET_KEY", "000000")).thenReturn(false);
+
+        boolean result = userProfileService.enable2fa("test@example.com", "000000");
+
+        assertFalse(result);
+        assertFalse(dummyUser.isTwoFactorEnabled());
+        verify(userRepository, never()).save(dummyUser);
+    }
+
+    @Test
+    void testEnable2fa_NotInitialized() {
+        dummyUser.setTwoFactorSecret(null);
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            userProfileService.enable2fa("test@example.com", "123456");
+        });
+
+        assertEquals("2FA belum diinisialisasi", exception.getMessage());
+    }
+
+    @Test
+    void testEnable2fa_UserNotFound() {
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+        assertThrows(UsernameNotFoundException.class, () -> {
+            userProfileService.enable2fa("unknown@example.com", "123456");
+        });
     }
 }

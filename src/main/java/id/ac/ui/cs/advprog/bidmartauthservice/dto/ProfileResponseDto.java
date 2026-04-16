@@ -17,4 +17,5 @@ public class ProfileResponseDto {
     private String address;
     private String bio;
     private String profilePictureUrl;
+    private boolean isTwoFactorEnabled;
 }
