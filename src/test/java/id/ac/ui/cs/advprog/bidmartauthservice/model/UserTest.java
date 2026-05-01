@@ -5,15 +5,25 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserTest {
 
     private User user;
+    private Set<Role> roles;
 
     @BeforeEach
     void setUp() {
+        roles = new HashSet<>();
+        roles.add(Role.builder()
+                .id(1L)
+                .name("BUYER")
+                .permissions(new HashSet<>())
+                .build());
+
         user = User.builder()
                 .id(1L)
                 .email("test@example.com")
@@ -23,6 +33,9 @@ class UserTest {
                 .address("Jl. Testing No. 1")
                 .bio("I am a tester")
                 .profilePictureUrl("https://example.com/pic.jpg")
+                .isTwoFactorEnabled(true)
+                .twoFactorSecret("SECRET_KEY")
+                .roles(roles)
                 .build();
     }
 
@@ -36,11 +49,21 @@ class UserTest {
         assertEquals("Jl. Testing No. 1", user.getAddress());
         assertEquals("I am a tester", user.getBio());
         assertEquals("https://example.com/pic.jpg", user.getProfilePictureUrl());
+        assertTrue(user.isTwoFactorEnabled());
+        assertEquals("SECRET_KEY", user.getTwoFactorSecret());
+        assertEquals(roles, user.getRoles());
     }
 
     @Test
     void testUserSetters() {
         User emptyUser = new User();
+
+        Set<Role> newRoles = new HashSet<>();
+        newRoles.add(Role.builder()
+                .id(2L)
+                .name("ADMIN")
+                .permissions(new HashSet<>())
+                .build());
 
         emptyUser.setId(2L);
         emptyUser.setEmail("new@example.com");
@@ -50,6 +73,9 @@ class UserTest {
         emptyUser.setAddress("Jl. Baru No. 2");
         emptyUser.setBio("New bio");
         emptyUser.setProfilePictureUrl("https://example.com/newpic.jpg");
+        emptyUser.setTwoFactorEnabled(false);
+        emptyUser.setTwoFactorSecret("NEW_SECRET");
+        emptyUser.setRoles(newRoles);
 
         assertEquals(2L, emptyUser.getId());
         assertEquals("new@example.com", emptyUser.getEmail());
@@ -59,6 +85,9 @@ class UserTest {
         assertEquals("Jl. Baru No. 2", emptyUser.getAddress());
         assertEquals("New bio", emptyUser.getBio());
         assertEquals("https://example.com/newpic.jpg", emptyUser.getProfilePictureUrl());
+        assertFalse(emptyUser.isTwoFactorEnabled());
+        assertEquals("NEW_SECRET", emptyUser.getTwoFactorSecret());
+        assertEquals(newRoles, emptyUser.getRoles());
     }
 
     @Test
@@ -70,6 +99,16 @@ class UserTest {
         assertTrue(user.isEnabled());
 
         Collection<? extends GrantedAuthority> authorities = user.getAuthorities();
+        assertNotNull(authorities);
+        assertEquals(1, authorities.size());
+        assertEquals("ROLE_BUYER", authorities.iterator().next().getAuthority());
+    }
+
+    @Test
+    void testGetAuthoritiesWithNullRoles() {
+        User userNullRoles = User.builder().email("test@mail.com").build();
+        Collection<? extends GrantedAuthority> authorities = userNullRoles.getAuthorities();
+
         assertNotNull(authorities);
         assertEquals(1, authorities.size());
         assertEquals("ROLE_USER", authorities.iterator().next().getAuthority());

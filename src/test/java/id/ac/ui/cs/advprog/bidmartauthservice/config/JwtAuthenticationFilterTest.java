@@ -1,7 +1,9 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.config;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.UserSession;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
+import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserSessionRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,10 +16,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +34,9 @@ class JwtAuthenticationFilterTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserSessionRepository userSessionRepository;
 
     @Mock
     private HttpServletRequest request;
@@ -42,33 +51,42 @@ class JwtAuthenticationFilterTest {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     private User dummyUser;
+    private UserSession dummySession;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        dummyUser = User.builder().email("test@example.com").password("pass").build();
+        dummyUser = User.builder().id(1L).email("test@example.com").password("pass").build();
+        dummySession = UserSession.builder().isActive(true).deviceId("Device-Test").build();
     }
 
     @Test
     void doFilterInternal_NoAuthHeader() throws Exception {
         when(request.getHeader("Authorization")).thenReturn(null);
+
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
         verify(filterChain, times(1)).doFilter(request, response);
     }
 
     @Test
     void doFilterInternal_InvalidAuthHeader() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Basic 12345");
+
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
         verify(filterChain, times(1)).doFilter(request, response);
     }
 
     @Test
-    void doFilterInternal_ValidToken() throws Exception {
+    void doFilterInternal_ValidTokenAndActiveSession() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
         when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(1L, "Device-Test"))
+                .thenReturn(Optional.of(dummySession));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -87,5 +105,27 @@ class JwtAuthenticationFilterTest {
 
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(filterChain, times(1)).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_ValidTokenButInactiveSession() throws Exception {
+        dummySession.setActive(false);
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+        when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(eq(1L), any()))
+                .thenReturn(Optional.of(dummySession));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 }

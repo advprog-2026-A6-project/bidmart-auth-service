@@ -3,8 +3,13 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.RegisterRequest;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.Role;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.UserSession;
+import id.ac.ui.cs.advprog.bidmartauthservice.repository.RoleRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
+import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserSessionRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +21,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,6 +36,12 @@ class AuthServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
+    private RoleRepository roleRepository;
+
+    @Mock
+    private UserSessionRepository userSessionRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -40,12 +53,16 @@ class AuthServiceImplTest {
     @Mock
     private TwoFactorAuthService twoFactorAuthService;
 
+    @Mock
+    private HttpServletRequest httpServletRequest;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
     private User user;
+    private Role role;
 
     @BeforeEach
     void setUp() {
@@ -65,11 +82,14 @@ class AuthServiceImplTest {
                 .password("encoded_password")
                 .isTwoFactorEnabled(false)
                 .build();
+
+        role = Role.builder().id(1L).name("BUYER").build();
     }
 
     @Test
     void testRegisterSuccess() {
         when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
+        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(role));
         when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
         when(userRepository.save(any(User.class))).thenReturn(user);
 
@@ -97,6 +117,8 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(user)).thenReturn("dummy_access_token");
         when(jwtService.generateRefreshToken(user)).thenReturn("dummy_refresh_token");
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Device-Test");
+        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByExpiresAtAsc(user.getId())).thenReturn(new ArrayList<>());
 
         AuthResponse response = authService.login(loginRequest);
 
@@ -106,6 +128,26 @@ class AuthServiceImplTest {
         assertEquals("dummy_refresh_token", response.getRefreshToken());
 
         verify(authenticationManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
+        verify(userSessionRepository, times(1)).save(any(UserSession.class));
+    }
+
+    @Test
+    void testLoginSuccessWithMaxDevices() {
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Device-Test");
+
+        List<UserSession> activeSessions = new ArrayList<>();
+        UserSession oldSession = UserSession.builder().id(1L).isActive(true).build();
+        activeSessions.add(oldSession);
+        activeSessions.add(UserSession.builder().id(2L).isActive(true).build());
+        activeSessions.add(UserSession.builder().id(3L).isActive(true).build());
+
+        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByExpiresAtAsc(user.getId())).thenReturn(activeSessions);
+
+        authService.login(loginRequest);
+
+        assertFalse(oldSession.isActive());
+        verify(userSessionRepository, times(2)).save(any(UserSession.class));
     }
 
     @Test
@@ -141,6 +183,8 @@ class AuthServiceImplTest {
         when(twoFactorAuthService.isOtpValid("SECRET_KEY", "123456")).thenReturn(true);
         when(jwtService.generateAccessToken(user)).thenReturn("dummy_access_token");
         when(jwtService.generateRefreshToken(user)).thenReturn("dummy_refresh_token");
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Device-Test");
+        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByExpiresAtAsc(user.getId())).thenReturn(new ArrayList<>());
 
         AuthResponse response = authService.verify2fa("aaron@test.com", "123456");
 
@@ -148,6 +192,7 @@ class AuthServiceImplTest {
         assertFalse(response.isMfaRequired());
         assertEquals("dummy_access_token", response.getAccessToken());
         assertEquals("dummy_refresh_token", response.getRefreshToken());
+        verify(userSessionRepository, times(1)).save(any(UserSession.class));
     }
 
     @Test

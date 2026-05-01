@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.config;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
+import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserSessionRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final UserSessionRepository userSessionRepository;
 
     @Override
     protected void doFilterInternal(
@@ -50,13 +52,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
 
             if (jwtService.isTokenValid(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+                User user = (User) userDetails;
+                String userAgent = request.getHeader("User-Agent");
+
+                if (userAgent == null) {
+                    userAgent = "Unknown Device";
+                }
+
+                var sessionOpt = userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(user.getId(), userAgent);
+                boolean isSessionActive = sessionOpt.isPresent() && sessionOpt.get().isActive();
+
+                if (isSessionActive) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Sesi telah berakhir atau dicabut dari perangkat lain.");
+                    return;
+                }
             }
         }
         filterChain.doFilter(request, response);
