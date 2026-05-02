@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -17,24 +18,28 @@ public class UserProfileController {
 
     private final UserProfileService userProfileService;
 
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER', 'ADMIN')")
     @GetMapping
     public ResponseEntity<ProfileResponseDto> getProfile(Principal principal) {
         ProfileResponseDto profile = userProfileService.getProfile(principal.getName());
         return ResponseEntity.ok(profile);
     }
 
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER', 'ADMIN')")
     @PutMapping
     public ResponseEntity<ProfileResponseDto> updateProfile(Principal principal, @RequestBody ProfileUpdateDto updateDto) {
         ProfileResponseDto updatedProfile = userProfileService.updateProfile(principal.getName(), updateDto);
         return ResponseEntity.ok(updatedProfile);
     }
 
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER', 'ADMIN')")
     @GetMapping("/2fa/generate")
     public ResponseEntity<?> generate2faQrCode(Principal principal) {
         String qrCodeUri = userProfileService.generate2faQrCode(principal.getName());
         return ResponseEntity.ok(Map.of("qrCodeUri", qrCodeUri));
     }
 
+    @PreAuthorize("hasAnyRole('BUYER', 'SELLER', 'ADMIN')")
     @PostMapping("/2fa/enable")
     public ResponseEntity<?> enable2fa(Principal principal, @RequestBody Map<String, String> request) {
         String code = request.get("code");
