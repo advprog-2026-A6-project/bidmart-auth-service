@@ -12,10 +12,12 @@ import lombok.NoArgsConstructor;
 public class ProfileResponseDto {
     private Long id;
     private String email;
+    private boolean emailVerified;
     private String name;
     private String phoneNumber;
     private String address;
     private String bio;
     private String profilePictureUrl;
     private boolean isTwoFactorEnabled;
+    private String twoFactorMethod;
 }

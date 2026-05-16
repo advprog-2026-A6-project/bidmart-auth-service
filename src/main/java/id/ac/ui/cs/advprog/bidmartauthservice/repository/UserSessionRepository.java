@@ -10,8 +10,12 @@ import java.util.Optional;
 @Repository
 public interface UserSessionRepository extends JpaRepository<UserSession, Long> {
 
-    List<UserSession> findByUserIdAndIsActiveTrueOrderByExpiresAtAsc(Long userId);
+    List<UserSession> findByUserIdAndIsActiveTrueOrderByCreatedAtAsc(Long userId);
 
-    Optional<UserSession> findTopByUserIdAndDeviceIdOrderByIdDesc(Long userId, String deviceId);
+    List<UserSession> findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(Long userId);
+
+    Optional<UserSession> findBySessionTokenId(String sessionTokenId);
+
+    Optional<UserSession> findByIdAndUserId(Long id, Long userId);
 
 }

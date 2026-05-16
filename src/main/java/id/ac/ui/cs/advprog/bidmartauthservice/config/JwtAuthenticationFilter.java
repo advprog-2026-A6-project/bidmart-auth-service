@@ -38,29 +38,39 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         final String jwt;
         final String userEmail;
+        final String sessionTokenId;
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        jwt = authHeader.substring(7);
-        userEmail = jwtService.extractUsername(jwt);
+        try {
+            jwt = authHeader.substring(7);
+            userEmail = jwtService.extractUsername(jwt);
+            sessionTokenId = jwtService.extractSessionTokenId(jwt);
+        } catch (RuntimeException ex) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token tidak valid.");
+            return;
+        }
 
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
 
+            if (sessionTokenId == null || sessionTokenId.isBlank()) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token sesi tidak ditemukan.");
+                return;
+            }
+
             if (jwtService.isTokenValid(jwt, userDetails)) {
                 User user = (User) userDetails;
-                String userAgent = request.getHeader("User-Agent");
-
-                if (userAgent == null) {
-                    userAgent = "Unknown Device";
-                }
-
-                var sessionOpt = userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(user.getId(), userAgent);
-                boolean isSessionActive = sessionOpt.isPresent() && sessionOpt.get().isActive();
+                var sessionOpt = userSessionRepository.findBySessionTokenId(sessionTokenId);
+                boolean isSessionActive = sessionOpt.isPresent()
+                        && sessionOpt.get().isActive()
+                        && sessionOpt.get().getUser().getId().equals(user.getId());
 
                 if (isSessionActive) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(

@@ -57,7 +57,12 @@ class JwtAuthenticationFilterTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         dummyUser = User.builder().id(1L).email("test@example.com").password("pass").build();
-        dummySession = UserSession.builder().isActive(true).deviceId("Device-Test").build();
+        dummySession = UserSession.builder()
+                .isActive(true)
+                .deviceId("Device-Test")
+                .sessionTokenId("session-123")
+                .user(dummyUser)
+                .build();
     }
 
     @Test
@@ -81,11 +86,11 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilterInternal_ValidTokenAndActiveSession() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
-        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
         when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
-        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(1L, "Device-Test"))
+        when(userSessionRepository.findBySessionTokenId("session-123"))
                 .thenReturn(Optional.of(dummySession));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -98,6 +103,7 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_InvalidOrExpiredToken() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer expired.token.here");
         when(jwtService.extractUsername("expired.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("expired.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("expired.token.here", dummyUser)).thenReturn(false);
 
@@ -111,11 +117,11 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_ValidTokenButInactiveSession() throws Exception {
         dummySession.setActive(false);
         when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
-        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
         when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
-        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(eq(1L), any()))
+        when(userSessionRepository.findBySessionTokenId("session-123"))
                 .thenReturn(Optional.of(dummySession));
 
         StringWriter stringWriter = new StringWriter();

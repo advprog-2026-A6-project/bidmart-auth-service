@@ -33,6 +33,10 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean emailVerified = false;
+
     @Column(name = "phone_number")
     private String phoneNumber;
 
@@ -48,6 +52,11 @@ public class User implements UserDetails {
     @Column(name = "is_two_factor_enabled", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean isTwoFactorEnabled = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "two_factor_method", nullable = false)
+    @Builder.Default
+    private TwoFactorMethod twoFactorMethod = TwoFactorMethod.NONE;
 
     @Column(name = "two_factor_secret")
     private String twoFactorSecret;

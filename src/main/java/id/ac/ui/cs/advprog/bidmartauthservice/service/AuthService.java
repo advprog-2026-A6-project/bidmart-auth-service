@@ -7,6 +7,10 @@ import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 
 public interface AuthService {
     User register(RegisterRequest request);
+    void verifyEmail(String token);
+    void resendVerificationEmail(String email);
     AuthResponse login(LoginRequest request);
-    AuthResponse verify2fa(String email, String code);
+    AuthResponse verify2fa(String challengeToken, String code);
+    AuthResponse refresh(String refreshToken);
+    void logout(String bearerToken);
 }

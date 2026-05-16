@@ -1,6 +1,5 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
-import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +13,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class JwtServiceTest {
+
+    private static final String SESSION_TOKEN_ID = "session-123";
 
     private JwtService jwtService;
 
@@ -34,29 +35,32 @@ class JwtServiceTest {
 
         when(userDetails.getUsername()).thenReturn("aaron.test@gmail.com");
 
-        String token = jwtService.generateAccessToken(userDetails);
+        String token = jwtService.generateAccessToken(userDetails, SESSION_TOKEN_ID);
         assertNotNull(token);
 
         String extractedUsername = jwtService.extractUsername(token);
         assertEquals("aaron.test@gmail.com", extractedUsername);
+        assertEquals(SESSION_TOKEN_ID, jwtService.extractSessionTokenId(token));
+        assertEquals("access", jwtService.extractTokenType(token));
     }
 
     @Test
     void testGenerateRefreshToken() {
         when(userDetails.getUsername()).thenReturn("aaron.test@gmail.com");
 
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        String refreshToken = jwtService.generateRefreshToken(userDetails, SESSION_TOKEN_ID);
         assertNotNull(refreshToken);
 
         String extractedUsername = jwtService.extractUsername(refreshToken);
         assertEquals("aaron.test@gmail.com", extractedUsername);
+        assertTrue(jwtService.isRefreshToken(refreshToken));
     }
 
     @Test
     void testIsTokenValid() {
         when(userDetails.getUsername()).thenReturn("aaron.test@gmail.com");
 
-        String token = jwtService.generateAccessToken(userDetails);
+        String token = jwtService.generateAccessToken(userDetails, SESSION_TOKEN_ID);
 
         boolean isValid = jwtService.isTokenValid(token, userDetails);
         assertTrue(isValid);
@@ -65,7 +69,7 @@ class JwtServiceTest {
     @Test
     void testIsTokenInvalidForDifferentUser() {
         when(userDetails.getUsername()).thenReturn("aaron.test@gmail.com");
-        String token = jwtService.generateAccessToken(userDetails);
+        String token = jwtService.generateAccessToken(userDetails, SESSION_TOKEN_ID);
 
         when(userDetails.getUsername()).thenReturn("hacker@gmail.com");
 

@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,11 +41,13 @@ class UserProfileServiceTest {
                 .email("test@example.com")
                 .password("hashedpassword")
                 .name("Tester")
+                .emailVerified(true)
                 .phoneNumber("08123456789")
                 .address("Jl. Testing No. 1")
                 .bio("I am a tester")
                 .profilePictureUrl("https://example.com/pic.jpg")
                 .isTwoFactorEnabled(false)
+                .twoFactorMethod(TwoFactorMethod.NONE)
                 .build();
     }
 
@@ -58,7 +61,9 @@ class UserProfileServiceTest {
         assertEquals(dummyUser.getEmail(), response.getEmail());
         assertEquals(dummyUser.getName(), response.getName());
         assertEquals(dummyUser.getPhoneNumber(), response.getPhoneNumber());
+        assertTrue(response.isEmailVerified());
         assertFalse(response.isTwoFactorEnabled());
+        assertEquals("NONE", response.getTwoFactorMethod());
 
         verify(userRepository, times(1)).findByEmail("test@example.com");
     }
@@ -94,6 +99,7 @@ class UserProfileServiceTest {
         assertEquals("Updated bio", response.getBio());
         assertEquals("https://example.com/newpic.jpg", response.getProfilePictureUrl());
         assertFalse(response.isTwoFactorEnabled());
+        assertEquals("NONE", response.getTwoFactorMethod());
 
         verify(userRepository, times(1)).save(any(User.class));
     }
@@ -134,25 +140,26 @@ class UserProfileServiceTest {
     }
 
     @Test
-    void testEnable2fa_Success() {
+    void testEnableTotp2fa_Success() {
         dummyUser.setTwoFactorSecret("SECRET_KEY");
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
         when(twoFactorAuthService.isOtpValid("SECRET_KEY", "123456")).thenReturn(true);
 
-        boolean result = userProfileService.enable2fa("test@example.com", "123456");
+        boolean result = userProfileService.enableTotp2fa("test@example.com", "123456");
 
         assertTrue(result);
         assertTrue(dummyUser.isTwoFactorEnabled());
+        assertEquals(TwoFactorMethod.TOTP, dummyUser.getTwoFactorMethod());
         verify(userRepository, times(1)).save(dummyUser);
     }
 
     @Test
-    void testEnable2fa_InvalidCode() {
+    void testEnableTotp2fa_InvalidCode() {
         dummyUser.setTwoFactorSecret("SECRET_KEY");
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
         when(twoFactorAuthService.isOtpValid("SECRET_KEY", "000000")).thenReturn(false);
 
-        boolean result = userProfileService.enable2fa("test@example.com", "000000");
+        boolean result = userProfileService.enableTotp2fa("test@example.com", "000000");
 
         assertFalse(result);
         assertFalse(dummyUser.isTwoFactorEnabled());
@@ -160,23 +167,52 @@ class UserProfileServiceTest {
     }
 
     @Test
-    void testEnable2fa_NotInitialized() {
+    void testEnableTotp2fa_NotInitialized() {
         dummyUser.setTwoFactorSecret(null);
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            userProfileService.enable2fa("test@example.com", "123456");
+            userProfileService.enableTotp2fa("test@example.com", "123456");
         });
 
         assertEquals("2FA belum diinisialisasi", exception.getMessage());
     }
 
     @Test
-    void testEnable2fa_UserNotFound() {
+    void testEnableTotp2fa_UserNotFound() {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class, () -> {
-            userProfileService.enable2fa("unknown@example.com", "123456");
+            userProfileService.enableTotp2fa("unknown@example.com", "123456");
         });
+    }
+
+    @Test
+    void testEnableEmail2fa_Success() {
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+        when(userRepository.save(any(User.class))).thenReturn(dummyUser);
+
+        ProfileResponseDto response = userProfileService.enableEmail2fa("test@example.com");
+
+        assertNotNull(response);
+        assertTrue(dummyUser.isTwoFactorEnabled());
+        assertEquals(TwoFactorMethod.EMAIL, dummyUser.getTwoFactorMethod());
+    }
+
+    @Test
+    void testDisable2fa_Success() {
+        dummyUser.setTwoFactorEnabled(true);
+        dummyUser.setTwoFactorMethod(TwoFactorMethod.TOTP);
+        dummyUser.setTwoFactorSecret("SECRET_KEY");
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
+        when(userRepository.save(any(User.class))).thenReturn(dummyUser);
+
+        ProfileResponseDto response = userProfileService.disable2fa("test@example.com");
+
+        assertNotNull(response);
+        assertFalse(dummyUser.isTwoFactorEnabled());
+        assertEquals(TwoFactorMethod.NONE, dummyUser.getTwoFactorMethod());
+        assertNull(dummyUser.getTwoFactorSecret());
     }
 }
