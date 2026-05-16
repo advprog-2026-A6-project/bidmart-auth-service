@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -227,6 +228,16 @@ class AuthServiceImplTest {
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> authService.login(loginRequest));
 
         assertEquals("Email belum diverifikasi", exception.getMessage());
+    }
+
+    @Test
+    void testLoginRejectedWhenUserInactive() {
+        user.setActive(false);
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
+
+        DisabledException exception = assertThrows(DisabledException.class, () -> authService.login(loginRequest));
+
+        assertEquals("Akun pengguna telah dinonaktifkan", exception.getMessage());
     }
 
     @Test

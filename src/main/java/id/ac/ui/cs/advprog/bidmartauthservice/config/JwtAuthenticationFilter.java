@@ -73,6 +73,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         && sessionOpt.get().getUser().getId().equals(user.getId());
 
                 if (isSessionActive) {
+                    if (!user.isEnabled()) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.getWriter().write("Akun pengguna telah dinonaktifkan.");
+                        return;
+                    }
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,

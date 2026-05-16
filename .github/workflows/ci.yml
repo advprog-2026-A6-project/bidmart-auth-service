@@ -5,6 +5,7 @@ on:
     branches: [ "staging", "main" ]
   pull_request:
     branches: [ "staging", "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -79,3 +80,15 @@ jobs:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: "bidmart-auth-service"
           heroku_email: "aaronsuhaendi@gmail.com"
+
+      - name: Verify deployed health endpoint
+        run: |
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent https://bidmart-auth-service.herokuapp.com/actuator/health; then
+              exit 0
+            fi
+            echo "Health check attempt ${attempt} failed, retrying..."
+            sleep 15
+          done
+          echo "Deployment health check failed"
+          exit 1

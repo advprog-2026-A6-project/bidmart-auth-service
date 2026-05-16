@@ -27,7 +27,7 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         Permission createAuction = ensurePermission("auction:create");
-        Permission banUser = ensurePermission("user:ban");
+        Permission deactivateUser = ensurePermission("user:deactivate");
         Permission placeBid = ensurePermission("bid:place");
         Permission profileRead = ensurePermission("profile:read");
         Permission profileUpdate = ensurePermission("profile:update");
@@ -37,7 +37,7 @@ public class DataSeeder implements CommandLineRunner {
         Permission rbacManage = ensurePermission("rbac:manage");
 
         ensureRole("ADMIN", Set.of(
-                createAuction, banUser, placeBid,
+                createAuction, deactivateUser, placeBid,
                 profileRead, profileUpdate, profileTwoFactorManage,
                 sessionRead, sessionRevoke, rbacManage
         ));
@@ -60,6 +60,7 @@ public class DataSeeder implements CommandLineRunner {
                     .email("admin@bidmart.com")
                     .password(passwordEncoder.encode("AdminBidmart123!"))
                     .name("Super Administrator")
+                    .active(true)
                     .emailVerified(true)
                     .twoFactorMethod(TwoFactorMethod.NONE)
                     .roles(new HashSet<>(Set.of(adminRole)))
@@ -73,6 +74,12 @@ public class DataSeeder implements CommandLineRunner {
         boolean adminUpdated = false;
         if (!adminUser.isEmailVerified()) {
             adminUser.setEmailVerified(true);
+            adminUpdated = true;
+        }
+        if (!adminUser.isActive()) {
+            adminUser.setActive(true);
+            adminUser.setDeactivatedAt(null);
+            adminUser.setDeactivationReason(null);
             adminUpdated = true;
         }
         if (adminUser.getTwoFactorMethod() == null) {

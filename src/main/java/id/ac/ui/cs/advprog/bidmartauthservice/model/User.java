@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -32,6 +33,16 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
+
+    @Column(name = "deactivation_reason")
+    private String deactivationReason;
 
     @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
@@ -113,6 +124,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
     }
 }

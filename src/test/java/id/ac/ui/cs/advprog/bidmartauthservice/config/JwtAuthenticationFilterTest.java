@@ -134,4 +134,25 @@ class JwtAuthenticationFilterTest {
         verify(filterChain, never()).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
+
+    @Test
+    void doFilterInternal_DisabledUserRejected() throws Exception {
+        dummyUser.setActive(false);
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+        when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(dummySession));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
 }
