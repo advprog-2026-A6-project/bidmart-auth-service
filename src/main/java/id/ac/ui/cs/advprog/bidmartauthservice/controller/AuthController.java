@@ -65,4 +65,16 @@ public class AuthController {
         authService.logout(authorizationHeader);
         return ResponseEntity.ok(Map.of("message", "Logout berhasil."));
     }
+
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/validate")
+    public ResponseEntity<?> validateToken(org.springframework.security.core.Authentication authentication) {
+        id.ac.ui.cs.advprog.bidmartauthservice.model.User user = (id.ac.ui.cs.advprog.bidmartauthservice.model.User) authentication.getPrincipal();
+        return ResponseEntity.ok(Map.of(
+                "valid", true,
+                "userId", user.getId(),
+                "email", user.getEmail(),
+                "authorities", authentication.getAuthorities()
+        ));
+    }
 }

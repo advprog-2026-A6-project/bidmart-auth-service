@@ -20,6 +20,7 @@ public class AuthEventPublisherService {
     private final AuthEventRepository authEventRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final ObjectMapper objectMapper;
+    private final org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
 
     @Transactional
     public AuthEvent publish(AuthEventType eventType, String aggregateType, String aggregateId, Map<String, Object> payload) {
@@ -31,6 +32,12 @@ public class AuthEventPublisherService {
                 .build());
 
         applicationEventPublisher.publishEvent(event);
+
+        try {
+            rabbitTemplate.convertAndSend("bidmart.auth.exchange", "auth.event." + eventType.name().toLowerCase(), event.getPayload());
+        } catch (Exception e) {
+            System.err.println("Gagal mengirim event ke RabbitMQ: " + e.getMessage());
+        }
 
         event.setPublishedAt(LocalDateTime.now());
         return authEventRepository.save(event);
