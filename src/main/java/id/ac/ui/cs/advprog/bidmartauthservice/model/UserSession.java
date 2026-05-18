@@ -25,7 +25,7 @@ public class UserSession {
     @Column(nullable = false)
     private String deviceId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 1024)
     private String refreshToken;
 
     @Column(nullable = false)
