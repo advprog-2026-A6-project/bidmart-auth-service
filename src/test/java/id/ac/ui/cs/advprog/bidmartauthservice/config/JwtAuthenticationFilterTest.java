@@ -57,7 +57,12 @@ class JwtAuthenticationFilterTest {
     void setUp() {
         SecurityContextHolder.clearContext();
         dummyUser = User.builder().id(1L).email("test@example.com").password("pass").build();
-        dummySession = UserSession.builder().isActive(true).deviceId("Device-Test").build();
+        dummySession = UserSession.builder()
+                .isActive(true)
+                .deviceId("Device-Test")
+                .sessionTokenId("session-123")
+                .user(dummyUser)
+                .build();
     }
 
     @Test
@@ -81,11 +86,11 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilterInternal_ValidTokenAndActiveSession() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
-        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
         when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
-        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(1L, "Device-Test"))
+        when(userSessionRepository.findBySessionTokenId("session-123"))
                 .thenReturn(Optional.of(dummySession));
 
         jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -98,6 +103,7 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_InvalidOrExpiredToken() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer expired.token.here");
         when(jwtService.extractUsername("expired.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("expired.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("expired.token.here", dummyUser)).thenReturn(false);
 
@@ -111,11 +117,11 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_ValidTokenButInactiveSession() throws Exception {
         dummySession.setActive(false);
         when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
-        when(request.getHeader("User-Agent")).thenReturn("Device-Test");
         when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
         when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
-        when(userSessionRepository.findTopByUserIdAndDeviceIdOrderByIdDesc(eq(1L), any()))
+        when(userSessionRepository.findBySessionTokenId("session-123"))
                 .thenReturn(Optional.of(dummySession));
 
         StringWriter stringWriter = new StringWriter();
@@ -127,5 +133,96 @@ class JwtAuthenticationFilterTest {
         verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         verify(filterChain, never()).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void doFilterInternal_DisabledUserRejected() throws Exception {
+        dummyUser.setActive(false);
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+        when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(dummySession));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void doFilterInternal_InvalidTokenExtractionRejected() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer broken.token");
+        when(jwtService.extractUsername("broken.token")).thenThrow(new RuntimeException("bad token"));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void doFilterInternal_MissingSessionTokenIdRejected() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn(" ");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_SessionOwnedByAnotherUserRejected() throws Exception {
+        User otherUser = User.builder().id(2L).email("other@example.com").password("pass").build();
+        dummySession.setUser(otherUser);
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+        when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(dummySession));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_SkipsWhenAuthenticationAlreadyPresent() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("existing", null)
+        );
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verify(userRepository, never()).findByEmail(any());
     }
 }

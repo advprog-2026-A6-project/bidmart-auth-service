@@ -6,13 +6,17 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,6 +37,20 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "deactivated_at")
+    private LocalDateTime deactivatedAt;
+
+    @Column(name = "deactivation_reason")
+    private String deactivationReason;
+
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean emailVerified = false;
+
     @Column(name = "phone_number")
     private String phoneNumber;
 
@@ -45,9 +63,27 @@ public class User implements UserDetails {
     @Column(name = "profile_picture_url")
     private String profilePictureUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_contact_method", nullable = false)
+    @Builder.Default
+    private PreferredContactMethod preferredContactMethod = PreferredContactMethod.EMAIL;
+
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean emailNotificationsEnabled = true;
+
+    @Column(name = "push_notifications_enabled", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean pushNotificationsEnabled = false;
+
     @Column(name = "is_two_factor_enabled", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean isTwoFactorEnabled = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "two_factor_method", nullable = false)
+    @Builder.Default
+    private TwoFactorMethod twoFactorMethod = TwoFactorMethod.NONE;
 
     @Column(name = "two_factor_secret")
     private String twoFactorSecret;
@@ -104,6 +140,18 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof User)) return false;
+        return id != null && id.equals(((User) o).getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

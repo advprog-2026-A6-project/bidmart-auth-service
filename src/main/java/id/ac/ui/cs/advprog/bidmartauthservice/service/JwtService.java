@@ -18,6 +18,11 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
+    private static final String SESSION_ID_CLAIM = "sid";
+    private static final String TOKEN_TYPE_CLAIM = "typ";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -36,15 +41,31 @@ public class JwtService {
         return claimsResolver.apply(claims);
     }
 
-    public String generateAccessToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails.getUsername(), accessTokenExpiration);
+    public String extractSessionTokenId(String token) {
+        return extractClaim(token, claims -> claims.get(SESSION_ID_CLAIM, String.class));
     }
 
-    public String generateRefreshToken(UserDetails userDetails) {
-        return generateToken(new HashMap<>(), userDetails.getUsername(), refreshTokenExpiration);
+    public String extractTokenType(String token) {
+        return extractClaim(token, claims -> claims.get(TOKEN_TYPE_CLAIM, String.class));
     }
 
-    private String generateToken(Map<String, Object> extraClaims, String subject, long expiration) {
+    public String generateAccessToken(UserDetails userDetails, String sessionTokenId) {
+        return generateToken(userDetails.getUsername(), accessTokenExpiration, sessionTokenId, ACCESS_TOKEN_TYPE);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, String sessionTokenId) {
+        return generateToken(userDetails.getUsername(), refreshTokenExpiration, sessionTokenId, REFRESH_TOKEN_TYPE);
+    }
+
+    public boolean isRefreshToken(String token) {
+        return REFRESH_TOKEN_TYPE.equals(extractTokenType(token));
+    }
+
+    private String generateToken(String subject, long expiration, String sessionTokenId, String tokenType) {
+        Map<String, Object> extraClaims = new HashMap<>();
+        extraClaims.put(SESSION_ID_CLAIM, sessionTokenId);
+        extraClaims.put(TOKEN_TYPE_CLAIM, tokenType);
+
         return Jwts.builder()
                 .setClaims(extraClaims)
                 .setSubject(subject)

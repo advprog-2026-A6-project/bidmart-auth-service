@@ -23,8 +23,10 @@ class UserSessionTest {
         userSession = UserSession.builder()
                 .id(1L)
                 .user(user)
+                .sessionTokenId("session-123")
                 .deviceId("Device-1")
                 .refreshToken("dummy_refresh_token")
+                .createdAt(time.minusHours(1))
                 .expiresAt(time)
                 .isActive(true)
                 .build();
@@ -34,8 +36,10 @@ class UserSessionTest {
     void testUserSessionGetters() {
         assertEquals(1L, userSession.getId());
         assertEquals(user, userSession.getUser());
+        assertEquals("session-123", userSession.getSessionTokenId());
         assertEquals("Device-1", userSession.getDeviceId());
         assertEquals("dummy_refresh_token", userSession.getRefreshToken());
+        assertEquals(time.minusHours(1), userSession.getCreatedAt());
         assertEquals(time, userSession.getExpiresAt());
         assertTrue(userSession.isActive());
     }
@@ -48,15 +52,19 @@ class UserSessionTest {
 
         emptySession.setId(2L);
         emptySession.setUser(newUser);
+        emptySession.setSessionTokenId("session-456");
         emptySession.setDeviceId("Device-2");
         emptySession.setRefreshToken("new_token");
+        emptySession.setCreatedAt(newTime.minusHours(1));
         emptySession.setExpiresAt(newTime);
         emptySession.setActive(false);
 
         assertEquals(2L, emptySession.getId());
         assertEquals(newUser, emptySession.getUser());
+        assertEquals("session-456", emptySession.getSessionTokenId());
         assertEquals("Device-2", emptySession.getDeviceId());
         assertEquals("new_token", emptySession.getRefreshToken());
+        assertEquals(newTime.minusHours(1), emptySession.getCreatedAt());
         assertEquals(newTime, emptySession.getExpiresAt());
         assertFalse(emptySession.isActive());
     }

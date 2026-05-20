@@ -1,50 +1,30 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.model;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class RoleTest {
 
-    private Role role;
-    private Set<Permission> permissions;
+    @Test
+    void testEqualsAndHashCode() {
+        Role role1 = Role.builder().id(1L).name("USER").build();
+        Role role2 = Role.builder().id(1L).name("ADMIN").build();
+        Role role3 = Role.builder().id(2L).name("USER").build();
 
-    @BeforeEach
-    void setUp() {
-        permissions = new HashSet<>();
-        permissions.add(Permission.builder().id(1L).name("READ_PRIVILEGE").build());
-
-        role = Role.builder()
-                .id(1L)
-                .name("BUYER")
-                .permissions(permissions)
-                .build();
+        assertThat(role1).isEqualTo(role2);
+        assertThat(role1).isNotEqualTo(role3);
+        assertThat(role1).isNotEqualTo(null);
+        assertThat(role1).isNotEqualTo(new Object());
+        assertThat(role1.hashCode()).isEqualTo(role2.hashCode());
     }
 
     @Test
-    void testRoleGetters() {
-        assertEquals(1L, role.getId());
-        assertEquals("BUYER", role.getName());
-        assertNotNull(role.getPermissions());
-        assertEquals(1, role.getPermissions().size());
-    }
+    void testEqualsHandlesSameInstanceAndNullId() {
+        Role role = Role.builder().id(1L).name("ADMIN").build();
+        Role nullIdRole = Role.builder().name("ADMIN").build();
 
-    @Test
-    void testRoleSetters() {
-        Role emptyRole = new Role();
-        emptyRole.setId(2L);
-        emptyRole.setName("SELLER");
-
-        Set<Permission> newPermissions = new HashSet<>();
-        emptyRole.setPermissions(newPermissions);
-
-        assertEquals(2L, emptyRole.getId());
-        assertEquals("SELLER", emptyRole.getName());
-        assertEquals(newPermissions, emptyRole.getPermissions());
+        assertThat(role).isEqualTo(role);
+        assertThat(nullIdRole).isNotEqualTo(Role.builder().name("ADMIN").build());
     }
 }
