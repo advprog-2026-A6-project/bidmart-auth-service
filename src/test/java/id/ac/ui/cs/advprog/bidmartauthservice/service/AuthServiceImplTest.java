@@ -127,6 +127,17 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void testRegisterFailsWhenDefaultRoleMissing() {
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
+        when(roleRepository.findByName("BUYER")).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> authService.register(registerRequest));
+
+        assertEquals("Role default BUYER tidak ditemukan. Pastikan DataSeeder berjalan.", exception.getMessage());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void testVerifyEmailSuccess() {
         VerificationToken token = VerificationToken.builder()
                 .token("verify-token")
@@ -153,6 +164,28 @@ class AuthServiceImplTest {
 
         assertEquals("Email sudah diverifikasi", exception.getMessage());
         verify(verificationTokenService, never()).createEmailVerification(any(User.class));
+    }
+
+    @Test
+    void testResendVerificationEmailSuccess() {
+        user.setEmailVerified(false);
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+
+        authService.resendVerificationEmail(user.getEmail());
+
+        verify(verificationTokenService).createEmailVerification(user);
+    }
+
+    @Test
+    void testResendVerificationEmailFailsWhenUserMissing() {
+        when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.resendVerificationEmail("missing@test.com")
+        );
+
+        assertEquals("User tidak ditemukan", exception.getMessage());
     }
 
     @Test
@@ -322,6 +355,54 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void testVerify2faSuccessWithEmailMethod() {
+        user.setTwoFactorEnabled(true);
+        user.setTwoFactorMethod(TwoFactorMethod.EMAIL);
+
+        VerificationToken challenge = VerificationToken.builder()
+                .token("challenge-token")
+                .user(user)
+                .method(VerificationMethod.EMAIL)
+                .code("654321")
+                .deviceId("Device-Test")
+                .build();
+
+        when(verificationTokenService.getValidLoginChallenge("challenge-token")).thenReturn(challenge);
+        when(jwtService.generateAccessToken(eq(user), anyString())).thenReturn("dummy_access_token");
+        when(jwtService.generateRefreshToken(eq(user), anyString())).thenReturn("dummy_refresh_token");
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Device-Test");
+        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtAsc(user.getId())).thenReturn(new ArrayList<>());
+
+        AuthResponse response = authService.verify2fa("challenge-token", "654321");
+
+        assertEquals("dummy_access_token", response.getAccessToken());
+        assertEquals("EMAIL", response.getTwoFactorMethod());
+        verify(twoFactorAuthService, never()).isOtpValid(anyString(), anyString());
+        verify(verificationTokenService).markConsumed(challenge);
+    }
+
+    @Test
+    void testVerify2faFailsWhenDeviceMismatch() {
+        VerificationToken challenge = VerificationToken.builder()
+                .token("challenge-token")
+                .user(user)
+                .method(VerificationMethod.EMAIL)
+                .code("654321")
+                .deviceId("Device-Test")
+                .build();
+
+        when(verificationTokenService.getValidLoginChallenge("challenge-token")).thenReturn(challenge);
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Other-Device");
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> authService.verify2fa("challenge-token", "654321")
+        );
+
+        assertEquals("Challenge 2FA tidak berlaku untuk perangkat ini", exception.getMessage());
+    }
+
+    @Test
     void testRefreshSuccess() {
         UserSession session = UserSession.builder()
                 .id(1L)
@@ -350,6 +431,104 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void testRefreshFailsWhenTokenBlank() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.refresh(" "));
+        assertEquals("Refresh token wajib diisi", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenTokenTypeInvalid() {
+        when(jwtService.isRefreshToken("access-token")).thenReturn(false);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.refresh("access-token"));
+
+        assertEquals("Token yang diberikan bukan refresh token", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenUserMissing() {
+        when(jwtService.isRefreshToken("refresh")).thenReturn(true);
+        when(jwtService.extractUsername("refresh")).thenReturn("missing@test.com");
+        when(jwtService.extractSessionTokenId("refresh")).thenReturn("session-123");
+        when(userRepository.findByEmail("missing@test.com")).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.refresh("refresh"));
+
+        assertEquals("User tidak ditemukan", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenTokenInvalid() {
+        when(jwtService.isRefreshToken("refresh")).thenReturn(true);
+        when(jwtService.extractUsername("refresh")).thenReturn(user.getEmail());
+        when(jwtService.extractSessionTokenId("refresh")).thenReturn("session-123");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(jwtService.isTokenValid("refresh", user)).thenReturn(false);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.refresh("refresh"));
+
+        assertEquals("Refresh token tidak valid", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenSessionMissing() {
+        when(jwtService.isRefreshToken("refresh")).thenReturn(true);
+        when(jwtService.extractUsername("refresh")).thenReturn(user.getEmail());
+        when(jwtService.extractSessionTokenId("refresh")).thenReturn("session-123");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(jwtService.isTokenValid("refresh", user)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.refresh("refresh"));
+
+        assertEquals("Sesi tidak ditemukan", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenSessionRevoked() {
+        UserSession session = UserSession.builder()
+                .sessionTokenId("session-123")
+                .refreshToken("refresh")
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .isActive(false)
+                .build();
+
+        when(jwtService.isRefreshToken("refresh")).thenReturn(true);
+        when(jwtService.extractUsername("refresh")).thenReturn(user.getEmail());
+        when(jwtService.extractSessionTokenId("refresh")).thenReturn("session-123");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(jwtService.isTokenValid("refresh", user)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(session));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> authService.refresh("refresh"));
+
+        assertEquals("Sesi sudah dicabut", exception.getMessage());
+    }
+
+    @Test
+    void testRefreshFailsWhenSessionExpired() {
+        UserSession session = UserSession.builder()
+                .sessionTokenId("session-123")
+                .refreshToken("refresh")
+                .expiresAt(LocalDateTime.now().minusMinutes(1))
+                .isActive(true)
+                .build();
+
+        when(jwtService.isRefreshToken("refresh")).thenReturn(true);
+        when(jwtService.extractUsername("refresh")).thenReturn(user.getEmail());
+        when(jwtService.extractSessionTokenId("refresh")).thenReturn("session-123");
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(Optional.of(user));
+        when(jwtService.isTokenValid("refresh", user)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(session));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> authService.refresh("refresh"));
+
+        assertEquals("Refresh token sudah kedaluwarsa", exception.getMessage());
+        assertFalse(session.isActive());
+        verify(userSessionRepository).save(session);
+    }
+
+    @Test
     void testLogoutRevokesSession() {
         UserSession session = UserSession.builder()
                 .sessionTokenId("session-123")
@@ -363,5 +542,24 @@ class AuthServiceImplTest {
 
         assertFalse(session.isActive());
         verify(userSessionRepository).save(session);
+    }
+
+    @Test
+    void testLogoutFailsWhenAuthorizationHeaderInvalid() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> authService.logout("Invalid"));
+        assertEquals("Authorization header tidak valid", exception.getMessage());
+    }
+
+    @Test
+    void testLogoutFailsWhenSessionMissing() {
+        when(jwtService.extractSessionTokenId("access-token")).thenReturn("session-404");
+        when(userSessionRepository.findBySessionTokenId("session-404")).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.logout("Bearer access-token")
+        );
+
+        assertEquals("Sesi tidak ditemukan", exception.getMessage());
     }
 }

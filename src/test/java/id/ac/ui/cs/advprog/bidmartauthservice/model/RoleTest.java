@@ -18,4 +18,13 @@ class RoleTest {
         assertThat(role1).isNotEqualTo(new Object());
         assertThat(role1.hashCode()).isEqualTo(role2.hashCode());
     }
+
+    @Test
+    void testEqualsHandlesSameInstanceAndNullId() {
+        Role role = Role.builder().id(1L).name("ADMIN").build();
+        Role nullIdRole = Role.builder().name("ADMIN").build();
+
+        assertThat(role).isEqualTo(role);
+        assertThat(nullIdRole).isNotEqualTo(Role.builder().name("ADMIN").build());
+    }
 }

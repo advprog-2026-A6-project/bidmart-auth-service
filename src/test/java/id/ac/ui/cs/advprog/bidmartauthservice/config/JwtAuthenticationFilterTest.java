@@ -155,4 +155,74 @@ class JwtAuthenticationFilterTest {
         verify(filterChain, never()).doFilter(request, response);
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
+
+    @Test
+    void doFilterInternal_InvalidTokenExtractionRejected() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer broken.token");
+        when(jwtService.extractUsername("broken.token")).thenThrow(new RuntimeException("bad token"));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    void doFilterInternal_MissingSessionTokenIdRejected() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn(" ");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_SessionOwnedByAnotherUserRejected() throws Exception {
+        User otherUser = User.builder().id(2L).email("other@example.com").password("pass").build();
+        dummySession.setUser(otherUser);
+
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(dummyUser));
+        when(jwtService.isTokenValid("valid.token.here", dummyUser)).thenReturn(true);
+        when(userSessionRepository.findBySessionTokenId("session-123")).thenReturn(Optional.of(dummySession));
+
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        when(response.getWriter()).thenReturn(printWriter);
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_SkipsWhenAuthenticationAlreadyPresent() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("existing", null)
+        );
+        when(request.getHeader("Authorization")).thenReturn("Bearer valid.token.here");
+        when(jwtService.extractUsername("valid.token.here")).thenReturn("test@example.com");
+        when(jwtService.extractSessionTokenId("valid.token.here")).thenReturn("session-123");
+
+        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verify(userRepository, never()).findByEmail(any());
+    }
 }

@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.*;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserSessionRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.AuthService;
@@ -15,6 +16,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.core.Authentication;
+import org.springframework.http.ResponseEntity;
+
+import java.util.HashSet;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -45,6 +51,9 @@ class AuthControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AuthController authController;
 
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
@@ -185,5 +194,28 @@ class AuthControllerTest {
                         .header("Authorization", "Bearer access_token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Logout berhasil."));
+
+        verify(authService).logout("Bearer access_token");
+    }
+
+    @Test
+    void testValidateTokenReturnsAuthenticationDetails() {
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        User principal = User.builder()
+                .id(99L)
+                .email("auth@test.com")
+                .roles(new HashSet<>())
+                .build();
+        when(authentication.getPrincipal()).thenReturn(principal);
+        when(authentication.getAuthorities()).thenReturn(List.of());
+
+        ResponseEntity<?> response = authController.validateToken(authentication);
+
+        org.assertj.core.api.Assertions.assertThat(response.getBody()).isEqualTo(java.util.Map.of(
+                "valid", true,
+                "userId", 99L,
+                "email", "auth@test.com",
+                "authorities", List.of()
+        ));
     }
 }
