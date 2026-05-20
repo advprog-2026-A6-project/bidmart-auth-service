@@ -6,6 +6,7 @@ import id.ac.ui.cs.advprog.bidmartauthservice.repository.VerificationTokenReposi
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +14,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class VerificationTokenService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailDeliveryService emailDeliveryService;
@@ -101,7 +104,7 @@ public class VerificationTokenService {
     }
 
     private String generateNumericCode() {
-        int code = (int) (Math.random() * 900000) + 100000;
+        int code = SECURE_RANDOM.nextInt(900000) + 100000;
         return Integer.toString(code);
     }
 }
