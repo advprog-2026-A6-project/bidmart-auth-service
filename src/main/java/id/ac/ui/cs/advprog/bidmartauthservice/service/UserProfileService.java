@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +23,17 @@ public class UserProfileService {
         return ProfileResponseDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .emailVerified(user.isEmailVerified())
                 .name(user.getName())
                 .phoneNumber(user.getPhoneNumber())
                 .address(user.getAddress())
                 .bio(user.getBio())
                 .profilePictureUrl(user.getProfilePictureUrl())
+                .preferredContactMethod(user.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(user.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(user.isTwoFactorEnabled())
+                .twoFactorMethod(user.getTwoFactorMethod().name())
                 .build();
     }
 
@@ -40,18 +46,32 @@ public class UserProfileService {
         user.setAddress(updateDto.getAddress());
         user.setBio(updateDto.getBio());
         user.setProfilePictureUrl(updateDto.getProfilePictureUrl());
+        if (updateDto.getPreferredContactMethod() != null) {
+            user.setPreferredContactMethod(updateDto.getPreferredContactMethod());
+        }
+        if (updateDto.getEmailNotificationsEnabled() != null) {
+            user.setEmailNotificationsEnabled(updateDto.getEmailNotificationsEnabled());
+        }
+        if (updateDto.getPushNotificationsEnabled() != null) {
+            user.setPushNotificationsEnabled(updateDto.getPushNotificationsEnabled());
+        }
 
         User updatedUser = userRepository.save(user);
 
         return ProfileResponseDto.builder()
                 .id(updatedUser.getId())
                 .email(updatedUser.getEmail())
+                .emailVerified(updatedUser.isEmailVerified())
                 .name(updatedUser.getName())
                 .phoneNumber(updatedUser.getPhoneNumber())
                 .address(updatedUser.getAddress())
                 .bio(updatedUser.getBio())
                 .profilePictureUrl(updatedUser.getProfilePictureUrl())
+                .preferredContactMethod(updatedUser.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(updatedUser.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(updatedUser.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(updatedUser.isTwoFactorEnabled())
+                .twoFactorMethod(updatedUser.getTwoFactorMethod().name())
                 .build();
     }
 
@@ -66,7 +86,7 @@ public class UserProfileService {
         return twoFactorAuthService.generateQrCodeImageUri(secret, user.getEmail());
     }
 
-    public boolean enable2fa(String email, String code) {
+    public boolean enableTotp2fa(String email, String code) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
 
@@ -78,10 +98,55 @@ public class UserProfileService {
 
         if (isValid) {
             user.setTwoFactorEnabled(true);
+            user.setTwoFactorMethod(TwoFactorMethod.TOTP);
             userRepository.save(user);
             return true;
         }
 
         return false;
+    }
+
+    public ProfileResponseDto enableEmail2fa(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
+
+        if (!user.isEmailVerified()) {
+            throw new IllegalStateException("Email harus diverifikasi sebelum mengaktifkan 2FA email");
+        }
+
+        user.setTwoFactorEnabled(true);
+        user.setTwoFactorMethod(TwoFactorMethod.EMAIL);
+        user.setTwoFactorSecret(null);
+
+        return mapToResponse(userRepository.save(user));
+    }
+
+    public ProfileResponseDto disable2fa(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
+
+        user.setTwoFactorEnabled(false);
+        user.setTwoFactorMethod(TwoFactorMethod.NONE);
+        user.setTwoFactorSecret(null);
+
+        return mapToResponse(userRepository.save(user));
+    }
+
+    private ProfileResponseDto mapToResponse(User user) {
+        return ProfileResponseDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .emailVerified(user.isEmailVerified())
+                .name(user.getName())
+                .phoneNumber(user.getPhoneNumber())
+                .address(user.getAddress())
+                .bio(user.getBio())
+                .profilePictureUrl(user.getProfilePictureUrl())
+                .preferredContactMethod(user.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(user.isPushNotificationsEnabled())
+                .isTwoFactorEnabled(user.isTwoFactorEnabled())
+                .twoFactorMethod(user.getTwoFactorMethod().name())
+                .build();
     }
 }
