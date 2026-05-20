@@ -29,6 +29,9 @@ public class UserProfileService {
                 .address(user.getAddress())
                 .bio(user.getBio())
                 .profilePictureUrl(user.getProfilePictureUrl())
+                .preferredContactMethod(user.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(user.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(user.isTwoFactorEnabled())
                 .twoFactorMethod(user.getTwoFactorMethod().name())
                 .build();
@@ -43,6 +46,15 @@ public class UserProfileService {
         user.setAddress(updateDto.getAddress());
         user.setBio(updateDto.getBio());
         user.setProfilePictureUrl(updateDto.getProfilePictureUrl());
+        if (updateDto.getPreferredContactMethod() != null) {
+            user.setPreferredContactMethod(updateDto.getPreferredContactMethod());
+        }
+        if (updateDto.getEmailNotificationsEnabled() != null) {
+            user.setEmailNotificationsEnabled(updateDto.getEmailNotificationsEnabled());
+        }
+        if (updateDto.getPushNotificationsEnabled() != null) {
+            user.setPushNotificationsEnabled(updateDto.getPushNotificationsEnabled());
+        }
 
         User updatedUser = userRepository.save(user);
 
@@ -55,6 +67,9 @@ public class UserProfileService {
                 .address(updatedUser.getAddress())
                 .bio(updatedUser.getBio())
                 .profilePictureUrl(updatedUser.getProfilePictureUrl())
+                .preferredContactMethod(updatedUser.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(updatedUser.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(updatedUser.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(updatedUser.isTwoFactorEnabled())
                 .twoFactorMethod(updatedUser.getTwoFactorMethod().name())
                 .build();
@@ -127,6 +142,9 @@ public class UserProfileService {
                 .address(user.getAddress())
                 .bio(user.getBio())
                 .profilePictureUrl(user.getProfilePictureUrl())
+                .preferredContactMethod(user.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(user.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(user.isTwoFactorEnabled())
                 .twoFactorMethod(user.getTwoFactorMethod().name())
                 .build();

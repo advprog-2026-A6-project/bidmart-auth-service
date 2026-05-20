@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.bidmartauthservice.dto.CodeRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.SessionResponseDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.PreferredContactMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserSessionRepository;
 import id.ac.ui.cs.advprog.bidmartauthservice.service.JwtService;
@@ -70,6 +71,9 @@ class UserProfileControllerTest {
                 .address("Jl. Testing No. 1")
                 .bio("I am a tester")
                 .profilePictureUrl("https://example.com/pic.jpg")
+                .preferredContactMethod("EMAIL")
+                .emailNotificationsEnabled(true)
+                .pushNotificationsEnabled(false)
                 .isTwoFactorEnabled(false)
                 .twoFactorMethod("NONE")
                 .build();
@@ -97,6 +101,9 @@ class UserProfileControllerTest {
                 .address("Jl. Baru No. 2")
                 .bio("Updated bio")
                 .profilePictureUrl("https://example.com/newpic.jpg")
+                .preferredContactMethod(PreferredContactMethod.PHONE)
+                .emailNotificationsEnabled(false)
+                .pushNotificationsEnabled(true)
                 .build();
 
         when(userProfileService.updateProfile(anyString(), any(ProfileUpdateDto.class))).thenReturn(dummyResponse);

@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
+import id.ac.ui.cs.advprog.bidmartauthservice.config.AuthSessionProperties;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.RegisterRequest;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -60,6 +62,9 @@ class AuthServiceImplTest {
 
     @Mock
     private HttpServletRequest httpServletRequest;
+
+    @Spy
+    private AuthSessionProperties authSessionProperties = new AuthSessionProperties();
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -171,6 +176,8 @@ class AuthServiceImplTest {
 
     @Test
     void testLoginSuccessWithMaxDevices() {
+        authSessionProperties.setMaxConcurrentSessions(3);
+        authSessionProperties.setOverflowPolicy(SessionOverflowPolicy.REVOKE_OLDEST);
         when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(eq(user), anyString())).thenReturn("dummy_access_token");
         when(jwtService.generateRefreshToken(eq(user), anyString())).thenReturn("dummy_refresh_token");
@@ -192,6 +199,21 @@ class AuthServiceImplTest {
 
         assertFalse(oldSession.isActive());
         verify(userSessionRepository, times(2)).save(any(UserSession.class));
+    }
+
+    @Test
+    void testLoginRejectedWhenMaxDevicesReachedAndPolicyRejectNew() {
+        authSessionProperties.setMaxConcurrentSessions(1);
+        authSessionProperties.setOverflowPolicy(SessionOverflowPolicy.REJECT_NEW);
+        when(userRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(user));
+        when(httpServletRequest.getHeader("User-Agent")).thenReturn("Device-Test");
+        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtAsc(user.getId()))
+                .thenReturn(List.of(UserSession.builder().id(1L).isActive(true).build()));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> authService.login(loginRequest));
+
+        assertEquals("Batas sesi aktif tercapai. Silakan logout dari perangkat lain terlebih dahulu.", exception.getMessage());
+        verify(userSessionRepository, never()).save(any(UserSession.class));
     }
 
     @Test

@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: auth-service
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
   datasource:
     url: ${SUPABASE_DB_URL:jdbc:h2:mem:testdb}
     username: ${SUPABASE_DB_USERNAME:sa}
@@ -18,6 +29,19 @@ jwt:
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
 
+auth:
+  email:
+    delivery-mode: ${AUTH_EMAIL_DELIVERY_MODE:SMTP}
+    from-address: ${AUTH_EMAIL_FROM:no-reply@bidmart.local}
+    application-name: ${AUTH_EMAIL_APP_NAME:BidMart}
+  session:
+    max-concurrent-sessions: ${AUTH_MAX_CONCURRENT_SESSIONS:3}
+    expiry-days: ${AUTH_SESSION_EXPIRY_DAYS:7}
+    overflow-policy: ${AUTH_SESSION_OVERFLOW_POLICY:REVOKE_OLDEST}
+  verification:
+    email-expiry-hours: ${AUTH_EMAIL_VERIFICATION_EXPIRY_HOURS:24}
+    login-challenge-expiry-minutes: ${AUTH_LOGIN_CHALLENGE_EXPIRY_MINUTES:5}
+
 management:
   endpoints:
     web:
@@ -28,6 +52,8 @@ management:
       probes:
         enabled: true
   health:
+    mail:
+      enabled: false
     rabbit:
       enabled: false
 

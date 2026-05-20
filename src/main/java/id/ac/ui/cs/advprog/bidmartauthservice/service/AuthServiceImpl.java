@@ -1,9 +1,11 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
+import id.ac.ui.cs.advprog.bidmartauthservice.config.AuthSessionProperties;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.AuthResponse;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.LoginRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.RegisterRequest;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.Role;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.SessionOverflowPolicy;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.UserSession;
@@ -40,9 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final TwoFactorAuthService twoFactorAuthService;
     private final VerificationTokenService verificationTokenService;
     private final HttpServletRequest httpServletRequest;
-
-    private static final int MAX_DEVICES = 3;
-    private static final int SESSION_EXPIRY_DAYS = 7;
+    private final AuthSessionProperties authSessionProperties;
 
     @Override
     public User register(RegisterRequest request) {
@@ -197,7 +197,11 @@ public class AuthServiceImpl implements AuthService {
     private AuthResponse generateAuthResponseWithSession(User user, String deviceId) {
         List<UserSession> activeSessions = userSessionRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtAsc(user.getId());
 
-        if (activeSessions.size() >= MAX_DEVICES) {
+        if (activeSessions.size() >= authSessionProperties.getMaxConcurrentSessions()) {
+            if (authSessionProperties.getOverflowPolicy() == SessionOverflowPolicy.REJECT_NEW) {
+                throw new IllegalStateException("Batas sesi aktif tercapai. Silakan logout dari perangkat lain terlebih dahulu.");
+            }
+
             UserSession oldestSession = activeSessions.get(0);
             oldestSession.setActive(false);
             userSessionRepository.save(oldestSession);
@@ -212,7 +216,7 @@ public class AuthServiceImpl implements AuthService {
                 .sessionTokenId(sessionTokenId)
                 .deviceId(deviceId)
                 .refreshToken(refreshToken)
-                .expiresAt(LocalDateTime.now().plusDays(SESSION_EXPIRY_DAYS))
+                .expiresAt(LocalDateTime.now().plusDays(authSessionProperties.getExpiryDays()))
                 .isActive(true)
                 .build();
 
@@ -232,7 +236,7 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtService.generateRefreshToken(user, session.getSessionTokenId());
 
         session.setRefreshToken(refreshToken);
-        session.setExpiresAt(LocalDateTime.now().plusDays(SESSION_EXPIRY_DAYS));
+        session.setExpiresAt(LocalDateTime.now().plusDays(authSessionProperties.getExpiryDays()));
         userSessionRepository.save(session);
 
         return AuthResponse.builder()

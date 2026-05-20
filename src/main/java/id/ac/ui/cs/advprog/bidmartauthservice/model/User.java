@@ -63,6 +63,19 @@ public class User implements UserDetails {
     @Column(name = "profile_picture_url")
     private String profilePictureUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_contact_method", nullable = false)
+    @Builder.Default
+    private PreferredContactMethod preferredContactMethod = PreferredContactMethod.EMAIL;
+
+    @Column(name = "email_notifications_enabled", nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean emailNotificationsEnabled = true;
+
+    @Column(name = "push_notifications_enabled", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private boolean pushNotificationsEnabled = false;
+
     @Column(name = "is_two_factor_enabled", nullable = false, columnDefinition = "boolean default false")
     @Builder.Default
     private boolean isTwoFactorEnabled = false;

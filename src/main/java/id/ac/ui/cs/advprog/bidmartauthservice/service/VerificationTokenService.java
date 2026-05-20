@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
+import id.ac.ui.cs.advprog.bidmartauthservice.config.AuthVerificationProperties;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.*;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.VerificationTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,11 +14,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VerificationTokenService {
 
-    private static final long EMAIL_VERIFICATION_EXPIRY_HOURS = 24;
-    private static final long LOGIN_CHALLENGE_EXPIRY_MINUTES = 5;
-
     private final VerificationTokenRepository verificationTokenRepository;
     private final EmailDeliveryService emailDeliveryService;
+    private final AuthVerificationProperties authVerificationProperties;
 
     public void createEmailVerification(User user) {
         invalidateOpenTokens(user.getId(), VerificationPurpose.EMAIL_VERIFICATION);
@@ -27,7 +26,7 @@ public class VerificationTokenService {
                 .token(UUID.randomUUID().toString())
                 .purpose(VerificationPurpose.EMAIL_VERIFICATION)
                 .method(VerificationMethod.LINK)
-                .expiresAt(LocalDateTime.now().plusHours(EMAIL_VERIFICATION_EXPIRY_HOURS))
+                .expiresAt(LocalDateTime.now().plusHours(authVerificationProperties.getEmailExpiryHours()))
                 .build());
 
         emailDeliveryService.sendVerificationEmail(user.getEmail(), token.getToken());
@@ -48,7 +47,7 @@ public class VerificationTokenService {
                 .purpose(VerificationPurpose.LOGIN_2FA)
                 .method(method)
                 .deviceId(deviceId)
-                .expiresAt(LocalDateTime.now().plusMinutes(LOGIN_CHALLENGE_EXPIRY_MINUTES))
+                .expiresAt(LocalDateTime.now().plusMinutes(authVerificationProperties.getLoginChallengeExpiryMinutes()))
                 .build());
 
         if (code != null) {

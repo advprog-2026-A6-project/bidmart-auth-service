@@ -18,6 +18,9 @@ public class ProfileResponseDto {
     private String address;
     private String bio;
     private String profilePictureUrl;
+    private String preferredContactMethod;
+    private boolean emailNotificationsEnabled;
+    private boolean pushNotificationsEnabled;
     private boolean isTwoFactorEnabled;
     private String twoFactorMethod;
 }

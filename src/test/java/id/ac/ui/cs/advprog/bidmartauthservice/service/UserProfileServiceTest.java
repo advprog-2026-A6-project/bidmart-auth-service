@@ -2,6 +2,7 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.model.PreferredContactMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
@@ -46,6 +47,9 @@ class UserProfileServiceTest {
                 .address("Jl. Testing No. 1")
                 .bio("I am a tester")
                 .profilePictureUrl("https://example.com/pic.jpg")
+                .preferredContactMethod(PreferredContactMethod.EMAIL)
+                .emailNotificationsEnabled(true)
+                .pushNotificationsEnabled(false)
                 .isTwoFactorEnabled(false)
                 .twoFactorMethod(TwoFactorMethod.NONE)
                 .build();
@@ -62,6 +66,9 @@ class UserProfileServiceTest {
         assertEquals(dummyUser.getName(), response.getName());
         assertEquals(dummyUser.getPhoneNumber(), response.getPhoneNumber());
         assertTrue(response.isEmailVerified());
+        assertEquals("EMAIL", response.getPreferredContactMethod());
+        assertTrue(response.isEmailNotificationsEnabled());
+        assertFalse(response.isPushNotificationsEnabled());
         assertFalse(response.isTwoFactorEnabled());
         assertEquals("NONE", response.getTwoFactorMethod());
 
@@ -85,6 +92,9 @@ class UserProfileServiceTest {
                 .address("Jl. Baru No. 2")
                 .bio("Updated bio")
                 .profilePictureUrl("https://example.com/newpic.jpg")
+                .preferredContactMethod(PreferredContactMethod.PHONE)
+                .emailNotificationsEnabled(false)
+                .pushNotificationsEnabled(true)
                 .build();
 
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(dummyUser));
@@ -98,6 +108,9 @@ class UserProfileServiceTest {
         assertEquals("Jl. Baru No. 2", response.getAddress());
         assertEquals("Updated bio", response.getBio());
         assertEquals("https://example.com/newpic.jpg", response.getProfilePictureUrl());
+        assertEquals("PHONE", response.getPreferredContactMethod());
+        assertFalse(response.isEmailNotificationsEnabled());
+        assertTrue(response.isPushNotificationsEnabled());
         assertFalse(response.isTwoFactorEnabled());
         assertEquals("NONE", response.getTwoFactorMethod());
 
