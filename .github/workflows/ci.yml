@@ -43,7 +43,18 @@ jobs:
           test -n "${SONAR_ORGANIZATION}" || (echo "SONAR_ORGANIZATION is not set" && exit 1)
 
       - name: Test + Lint + Coverage
-        run: ./gradlew --no-daemon clean check jacocoTestReport
+        run: ./gradlew --no-daemon clean check jacocoTestReport aggregate
+
+      - name: Upload test, coverage, and functional report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bidmart-auth-service-reports
+          path: |
+            build/reports/tests/test
+            build/reports/jacoco/test
+            build/site/serenity
+          if-no-files-found: warn
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v6
