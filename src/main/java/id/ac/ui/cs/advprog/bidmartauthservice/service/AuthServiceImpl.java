@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -50,8 +51,11 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("Email sudah terdaftar!");
         }
 
-        Role defaultRole = roleRepository.findByName("BUYER")
-                .orElseThrow(() -> new RuntimeException("Role default BUYER tidak ditemukan. Pastikan DataSeeder berjalan."));
+        String requestedRoleName = resolveRequestedRegistrationRole(request.getRole());
+        Role requestedRole = roleRepository.findByName(requestedRoleName)
+                .orElseThrow(() -> new RuntimeException(
+                        "Role registrasi " + requestedRoleName + " tidak ditemukan. Pastikan DataSeeder berjalan."
+                ));
 
         User newUser = User.builder()
                 .name(request.getName())
@@ -59,12 +63,25 @@ public class AuthServiceImpl implements AuthService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .emailVerified(false)
                 .twoFactorMethod(TwoFactorMethod.NONE)
-                .roles(new HashSet<>(Set.of(defaultRole)))
+                .roles(new HashSet<>(Set.of(requestedRole)))
                 .build();
 
         User savedUser = userRepository.save(newUser);
         verificationTokenService.createEmailVerification(savedUser);
         return savedUser;
+    }
+
+    private String resolveRequestedRegistrationRole(String requestedRole) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return "BUYER";
+        }
+
+        String normalizedRole = requestedRole.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("BUYER", "SELLER").contains(normalizedRole)) {
+            throw new IllegalArgumentException("Role registrasi hanya boleh BUYER atau SELLER");
+        }
+
+        return normalizedRole;
     }
 
     @Override

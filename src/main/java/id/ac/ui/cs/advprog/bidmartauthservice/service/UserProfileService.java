@@ -2,6 +2,8 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.SellerPublicProfileResponseDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.UserContactPreferencesResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.UserRepository;
@@ -34,6 +36,39 @@ public class UserProfileService {
                 .pushNotificationsEnabled(user.isPushNotificationsEnabled())
                 .isTwoFactorEnabled(user.isTwoFactorEnabled())
                 .twoFactorMethod(user.getTwoFactorMethod().name())
+                .build();
+    }
+
+    public SellerPublicProfileResponseDto getPublicSellerProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
+
+        if (!user.isActive()) {
+            throw new UsernameNotFoundException("Seller tidak tersedia");
+        }
+
+        return SellerPublicProfileResponseDto.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .bio(user.getBio())
+                .profilePictureUrl(user.getProfilePictureUrl())
+                .build();
+    }
+
+    public UserContactPreferencesResponseDto getContactPreferences(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
+
+        if (!user.isActive()) {
+            throw new UsernameNotFoundException("User tidak tersedia");
+        }
+
+        return UserContactPreferencesResponseDto.builder()
+                .userId(user.getId())
+                .email(user.getEmail())
+                .preferredContactMethod(user.getPreferredContactMethod().name())
+                .emailNotificationsEnabled(user.isEmailNotificationsEnabled())
+                .pushNotificationsEnabled(user.isPushNotificationsEnabled())
                 .build();
     }
 

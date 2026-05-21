@@ -26,6 +26,7 @@ public class SecurityConfig {
 
     private final UserRepository userRepository;
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final InternalServiceTokenFilter internalServiceTokenFilter;
 
     @Bean
     public UserDetailsService userDetailsService() {
@@ -59,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/index.html", "/profile.html").permitAll()
                         .requestMatchers("/dummy/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/api/internal/users/**").hasRole("INTERNAL_SERVICE")
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/verify-email",
@@ -70,6 +72,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(internalServiceTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

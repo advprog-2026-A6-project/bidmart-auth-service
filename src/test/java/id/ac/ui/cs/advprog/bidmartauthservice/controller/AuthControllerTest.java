@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -64,6 +65,7 @@ class AuthControllerTest {
         registerRequest.setName("Aaron Nathanael");
         registerRequest.setEmail("aaron@test.com");
         registerRequest.setPassword("rahasia123");
+        registerRequest.setRole("BUYER");
 
         loginRequest = new LoginRequest();
         loginRequest.setEmail("aaron@test.com");
@@ -211,11 +213,18 @@ class AuthControllerTest {
 
         ResponseEntity<?> response = authController.validateToken(authentication);
 
-        org.assertj.core.api.Assertions.assertThat(response.getBody()).isEqualTo(java.util.Map.of(
-                "valid", true,
-                "userId", 99L,
-                "email", "auth@test.com",
-                "authorities", List.of()
-        ));
+        org.assertj.core.api.Assertions.assertThat(response.getBody())
+                .isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        org.assertj.core.api.Assertions.assertThat(body)
+                .containsEntry("valid", true)
+                .containsEntry("userId", 99L)
+                .containsEntry("email", "auth@test.com")
+                .containsEntry("active", true)
+                .containsEntry("disabled", false)
+                .containsEntry("roles", List.of())
+                .containsEntry("permissions", List.of())
+                .containsEntry("authorities", List.of());
     }
 }
