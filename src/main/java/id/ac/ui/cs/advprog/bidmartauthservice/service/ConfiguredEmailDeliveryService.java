@@ -71,6 +71,13 @@ public class ConfiguredEmailDeliveryService implements EmailDeliveryService {
             mailSender.send(message);
             log.info("Email '{}' berhasil dikirim ke {}", subject, recipient);
         } catch (MailException exception) {
+            log.error(
+                    "Gagal mengirim email '{}' ke {} menggunakan from-address {}",
+                    subject,
+                    recipient,
+                    authEmailProperties.getFromAddress(),
+                    exception
+            );
             throw new IllegalStateException("Gagal mengirim email ke " + recipient, exception);
         }
     }

@@ -2,6 +2,8 @@ package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.dto.ProfileUpdateDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.SellerPublicProfileResponseDto;
+import id.ac.ui.cs.advprog.bidmartauthservice.dto.UserContactPreferencesResponseDto;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.PreferredContactMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.TwoFactorMethod;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.User;
@@ -115,6 +117,57 @@ class UserProfileServiceTest {
         assertEquals("NONE", response.getTwoFactorMethod());
 
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void testGetPublicSellerProfile_Success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(dummyUser));
+
+        SellerPublicProfileResponseDto response = userProfileService.getPublicSellerProfile(1L);
+
+        assertNotNull(response);
+        assertEquals(dummyUser.getId(), response.getId());
+        assertEquals(dummyUser.getName(), response.getName());
+        assertEquals(dummyUser.getBio(), response.getBio());
+        assertEquals(dummyUser.getProfilePictureUrl(), response.getProfilePictureUrl());
+    }
+
+    @Test
+    void testGetPublicSellerProfile_InactiveSeller() {
+        dummyUser.setActive(false);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(dummyUser));
+
+        UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class, () -> {
+            userProfileService.getPublicSellerProfile(1L);
+        });
+
+        assertEquals("Seller tidak tersedia", exception.getMessage());
+    }
+
+    @Test
+    void testGetContactPreferences_Success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(dummyUser));
+
+        UserContactPreferencesResponseDto response = userProfileService.getContactPreferences(1L);
+
+        assertNotNull(response);
+        assertEquals(dummyUser.getId(), response.getUserId());
+        assertEquals(dummyUser.getEmail(), response.getEmail());
+        assertEquals("EMAIL", response.getPreferredContactMethod());
+        assertTrue(response.isEmailNotificationsEnabled());
+        assertFalse(response.isPushNotificationsEnabled());
+    }
+
+    @Test
+    void testGetContactPreferences_InactiveUser() {
+        dummyUser.setActive(false);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(dummyUser));
+
+        UsernameNotFoundException exception = assertThrows(UsernameNotFoundException.class, () -> {
+            userProfileService.getContactPreferences(1L);
+        });
+
+        assertEquals("User tidak tersedia", exception.getMessage());
     }
 
     @Test

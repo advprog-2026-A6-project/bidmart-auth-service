@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -70,11 +71,29 @@ public class AuthController {
     @GetMapping("/validate")
     public ResponseEntity<?> validateToken(org.springframework.security.core.Authentication authentication) {
         id.ac.ui.cs.advprog.bidmartauthservice.model.User user = (id.ac.ui.cs.advprog.bidmartauthservice.model.User) authentication.getPrincipal();
+        List<String> authorities = authentication.getAuthorities().stream()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .sorted()
+                .toList();
+        List<String> roles = user.getRoles().stream()
+                .map(id.ac.ui.cs.advprog.bidmartauthservice.model.Role::getName)
+                .sorted()
+                .toList();
+        List<String> permissions = user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(id.ac.ui.cs.advprog.bidmartauthservice.model.Permission::getName)
+                .distinct()
+                .sorted()
+                .toList();
         return ResponseEntity.ok(Map.of(
                 "valid", true,
                 "userId", user.getId(),
                 "email", user.getEmail(),
-                "authorities", authentication.getAuthorities()
+                "active", user.isActive(),
+                "disabled", !user.isActive(),
+                "roles", roles,
+                "permissions", permissions,
+                "authorities", authorities
         ));
     }
 }
