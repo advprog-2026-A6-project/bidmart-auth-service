@@ -1,3 +1,13 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath("net.serenity-bdd:serenity-gradle-plugin:5.2.0")
+    }
+}
+
 plugins {
     java
     id("org.springframework.boot") version "3.5.10"
@@ -6,9 +16,13 @@ plugins {
     id("org.sonarqube") version "4.4.1.3373"
 }
 
+apply(plugin = "net.serenity-bdd.serenity-gradle-plugin")
+
 group = "id.ac.ui.cs.advprog"
 version = "0.0.1-SNAPSHOT"
 description = "bidmart-auth-service"
+
+val serenityVersion = "5.3.7"
 
 java {
     toolchain {
@@ -42,6 +56,9 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("net.serenity-bdd:serenity-core:$serenityVersion")
+    testImplementation("net.serenity-bdd:serenity-junit5:$serenityVersion")
+    testImplementation("net.serenity-bdd:serenity-rest-assured:$serenityVersion")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation("io.jsonwebtoken:jjwt-api:0.11.5")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
@@ -53,6 +70,8 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    systemProperty("serenity.project.name", "BidMart Auth Service Functional Tests")
+    systemProperty("serenity.outputDirectory", layout.buildDirectory.dir("site/serenity").get().asFile.absolutePath)
     finalizedBy(tasks.jacocoTestReport)
 }
 
@@ -63,6 +82,10 @@ tasks.jacocoTestReport {
         csv.required.set(false)
         html.required.set(true)
     }
+}
+
+tasks.named("aggregate") {
+    dependsOn(tasks.test)
 }
 
 sonar {
