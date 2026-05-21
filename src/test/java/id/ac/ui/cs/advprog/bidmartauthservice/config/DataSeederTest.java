@@ -56,7 +56,7 @@ class DataSeederTest {
 
         dataSeeder.run();
 
-        verify(permissionRepository, times(9)).save(any(Permission.class));
+        verify(permissionRepository, times(11)).save(any(Permission.class));
         verify(roleRepository, times(3)).save(any(Role.class));
         verify(userRepository, times(1)).save(any(User.class));
     }

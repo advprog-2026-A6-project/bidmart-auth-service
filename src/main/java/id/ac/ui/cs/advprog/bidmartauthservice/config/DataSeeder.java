@@ -27,6 +27,8 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         Permission createAuction = ensurePermission("auction:create");
+        Permission startAuction = ensurePermission("auction:start");
+        Permission closeAuction = ensurePermission("auction:close");
         Permission deactivateUser = ensurePermission("user:deactivate");
         Permission placeBid = ensurePermission("bid:place");
         Permission profileRead = ensurePermission("profile:read");
@@ -37,12 +39,12 @@ public class DataSeeder implements CommandLineRunner {
         Permission rbacManage = ensurePermission("rbac:manage");
 
         ensureRole("ADMIN", Set.of(
-                createAuction, deactivateUser, placeBid,
+                createAuction, startAuction, closeAuction, deactivateUser, placeBid,
                 profileRead, profileUpdate, profileTwoFactorManage,
                 sessionRead, sessionRevoke, rbacManage
         ));
         ensureRole("SELLER", Set.of(
-                createAuction,
+                createAuction, startAuction, closeAuction,
                 profileRead, profileUpdate, profileTwoFactorManage,
                 sessionRead, sessionRevoke
         ));

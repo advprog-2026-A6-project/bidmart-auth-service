@@ -1,24 +1,24 @@
 package id.ac.ui.cs.advprog.bidmartauthservice.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import id.ac.ui.cs.advprog.bidmartauthservice.config.RabbitMqConfig;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.AuthEvent;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.AuthEventType;
 import id.ac.ui.cs.advprog.bidmartauthservice.repository.AuthEventRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -33,82 +33,112 @@ class AuthEventPublisherServiceTest {
     private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
-    private ObjectMapper objectMapper;
-
-    @Mock
     private RabbitTemplate rabbitTemplate;
 
-    @InjectMocks
-    private AuthEventPublisherService authEventPublisherService;
+    private AuthEventPublisherService authEventPublisherService() {
+        return new AuthEventPublisherService(
+                authEventRepository,
+                applicationEventPublisher,
+                new ObjectMapper(),
+                rabbitTemplate
+        );
+    }
 
     @Test
-    void publishPersistsEventPublishesApplicationEventAndSendsRabbitMessage() throws Exception {
+    void publishPersistsEventAndQueuesAfterCommitDispatch() {
         when(authEventRepository.save(any(AuthEvent.class))).thenAnswer(invocation -> {
             AuthEvent event = invocation.getArgument(0);
-            if (event.getId() == null) {
-                event.setId(1L);
-            }
+            event.setId(10L);
             return event;
         });
-        when(objectMapper.writeValueAsString(any())).thenReturn("{\"userId\":1}");
 
-        AuthEvent event = authEventPublisherService.publish(
+        AuthEvent result = authEventPublisherService().publish(
                 AuthEventType.ACCOUNT_DISABLED,
                 "USER",
-                "1",
-                Map.of("userId", 1)
+                "42",
+                Map.of("userId", 42L)
         );
 
-        assertThat(event.getPayload()).isEqualTo("{\"userId\":1}");
-        assertThat(event.getPublishedAt()).isNotNull();
-        verify(applicationEventPublisher).publishEvent(event);
-        verify(rabbitTemplate).convertAndSend("bidmart.auth.exchange", "auth.event.account_disabled", "{\"userId\":1}");
-        verify(authEventRepository, times(2)).save(any(AuthEvent.class));
+        assertNotNull(result.getId());
+        assertNull(result.getPublishedAt());
+        verify(applicationEventPublisher).publishEvent(result);
+        verifyNoInteractions(rabbitTemplate);
     }
 
     @Test
-    void publishStillMarksEventWhenRabbitFails() throws Exception {
-        when(authEventRepository.save(any(AuthEvent.class))).thenAnswer(invocation -> {
-            AuthEvent event = invocation.getArgument(0);
-            if (event.getId() == null) {
-                event.setId(1L);
-            }
-            return event;
-        });
-        when(objectMapper.writeValueAsString(any())).thenReturn("{\"role\":\"ADMIN\"}");
-        doThrow(new RuntimeException("rabbit down"))
+    void dispatchPendingEventMarksEventPublishedAfterSuccessfulBrokerSend() {
+        AuthEvent pendingEvent = AuthEvent.builder()
+                .id(22L)
+                .eventType(AuthEventType.ACCOUNT_DISABLED)
+                .aggregateType("USER")
+                .aggregateId("42")
+                .payload("{\"userId\":42}")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(authEventRepository.findByIdAndPublishedAtIsNull(22L)).thenReturn(Optional.of(pendingEvent));
+        when(authEventRepository.save(any(AuthEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        authEventPublisherService().dispatchPendingEvent(22L);
+
+        verify(rabbitTemplate).convertAndSend(
+                eq(RabbitMqConfig.EXCHANGE_NAME),
+                eq("auth.event.account_disabled"),
+                eq("{\"userId\":42}")
+        );
+
+        ArgumentCaptor<AuthEvent> savedCaptor = ArgumentCaptor.forClass(AuthEvent.class);
+        verify(authEventRepository).save(savedCaptor.capture());
+        assertNotNull(savedCaptor.getValue().getPublishedAt());
+    }
+
+    @Test
+    void dispatchPendingEventLeavesEventUnpublishedWhenBrokerSendFails() {
+        AuthEvent pendingEvent = AuthEvent.builder()
+                .id(23L)
+                .eventType(AuthEventType.ACCOUNT_DISABLED)
+                .aggregateType("USER")
+                .aggregateId("99")
+                .payload("{\"userId\":99}")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(authEventRepository.findByIdAndPublishedAtIsNull(23L)).thenReturn(Optional.of(pendingEvent));
+        doThrow(new IllegalStateException("broker down"))
                 .when(rabbitTemplate)
-                .convertAndSend(anyString(), anyString(), any(String.class));
+                .convertAndSend(any(String.class), any(String.class), any(String.class));
 
-        AuthEvent event = authEventPublisherService.publish(
-                AuthEventType.ROLE_CREATED,
-                "ROLE",
-                "ADMIN",
-                Map.of("role", "ADMIN")
-        );
+        authEventPublisherService().dispatchPendingEvent(23L);
 
-        assertThat(event.getPublishedAt()).isNotNull();
-        verify(applicationEventPublisher).publishEvent(event);
-        verify(authEventRepository, times(2)).save(any(AuthEvent.class));
+        verify(authEventRepository, never()).save(any(AuthEvent.class));
+        assertNull(pendingEvent.getPublishedAt());
     }
 
     @Test
-    void publishThrowsWhenPayloadSerializationFails() throws Exception {
-        when(objectMapper.writeValueAsString(any()))
-                .thenThrow(new JsonProcessingException("boom") {});
+    void retryUnpublishedEventsDispatchesPendingBatch() {
+        AuthEvent first = AuthEvent.builder()
+                .id(1L)
+                .eventType(AuthEventType.ACCOUNT_DISABLED)
+                .aggregateType("USER")
+                .aggregateId("1")
+                .payload("{\"userId\":1}")
+                .build();
+        AuthEvent second = AuthEvent.builder()
+                .id(2L)
+                .eventType(AuthEventType.USER_ROLE_CHANGED)
+                .aggregateType("USER")
+                .aggregateId("2")
+                .payload("{\"userId\":2}")
+                .build();
 
-        IllegalStateException exception = assertThrows(
-                IllegalStateException.class,
-                () -> authEventPublisherService.publish(
-                        AuthEventType.PERMISSION_CREATED,
-                        "PERMISSION",
-                        "bid:place",
-                        Map.of("permission", "bid:place")
-                )
-        );
+        when(authEventRepository.findTop50ByPublishedAtIsNullOrderByCreatedAtAsc())
+                .thenReturn(List.of(first, second));
+        when(authEventRepository.findByIdAndPublishedAtIsNull(1L)).thenReturn(Optional.of(first));
+        when(authEventRepository.findByIdAndPublishedAtIsNull(2L)).thenReturn(Optional.of(second));
+        when(authEventRepository.save(any(AuthEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(exception.getMessage()).isEqualTo("Gagal menyimpan payload event autentikasi");
-        verify(authEventRepository, never()).save(any());
-        verifyNoInteractions(applicationEventPublisher, rabbitTemplate);
+        authEventPublisherService().retryUnpublishedEvents();
+
+        verify(rabbitTemplate, times(2)).convertAndSend(any(String.class), any(String.class), any(String.class));
     }
 }

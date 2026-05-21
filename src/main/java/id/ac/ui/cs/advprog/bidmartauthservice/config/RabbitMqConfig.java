@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMqConfig {
 
     public static final String EXCHANGE_NAME = "bidmart.auth.exchange";
+    public static final String ROUTING_KEY_PREFIX = "auth.event.";
 
     @Bean
     public TopicExchange authExchange() {

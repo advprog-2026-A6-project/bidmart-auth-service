@@ -72,7 +72,8 @@ class AuthServiceImplTest {
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
     private User user;
-    private Role role;
+    private Role buyerRole;
+    private Role sellerRole;
 
     @BeforeEach
     void setUp() {
@@ -80,6 +81,7 @@ class AuthServiceImplTest {
         registerRequest.setName("Aaron Nathanael");
         registerRequest.setEmail("aaron@test.com");
         registerRequest.setPassword("rahasia123");
+        registerRequest.setRole("BUYER");
 
         loginRequest = new LoginRequest();
         loginRequest.setEmail("aaron@test.com");
@@ -96,13 +98,14 @@ class AuthServiceImplTest {
                 .roles(new HashSet<>())
                 .build();
 
-        role = Role.builder().id(1L).name("BUYER").build();
+        buyerRole = Role.builder().id(1L).name("BUYER").build();
+        sellerRole = Role.builder().id(2L).name("SELLER").build();
     }
 
     @Test
     void testRegisterSuccess() {
         when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
-        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(role));
+        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(buyerRole));
         when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -113,6 +116,22 @@ class AuthServiceImplTest {
         assertFalse(savedUser.isEmailVerified());
         verify(userRepository, times(1)).save(any(User.class));
         verify(verificationTokenService, times(1)).createEmailVerification(any(User.class));
+    }
+
+    @Test
+    void testRegisterSuccessAsSeller() {
+        registerRequest.setRole("seller");
+
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
+        when(roleRepository.findByName("SELLER")).thenReturn(Optional.of(sellerRole));
+        when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User savedUser = authService.register(registerRequest);
+
+        assertTrue(savedUser.getRoles().stream().anyMatch(role -> "SELLER".equals(role.getName())));
+        verify(roleRepository).findByName("SELLER");
+        verify(verificationTokenService).createEmailVerification(any(User.class));
     }
 
     @Test
@@ -133,7 +152,37 @@ class AuthServiceImplTest {
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> authService.register(registerRequest));
 
-        assertEquals("Role default BUYER tidak ditemukan. Pastikan DataSeeder berjalan.", exception.getMessage());
+        assertEquals("Role registrasi BUYER tidak ditemukan. Pastikan DataSeeder berjalan.", exception.getMessage());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void testRegisterFallsBackToBuyerWhenRoleMissing() {
+        registerRequest.setRole(null);
+
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
+        when(roleRepository.findByName("BUYER")).thenReturn(Optional.of(buyerRole));
+        when(passwordEncoder.encode(registerRequest.getPassword())).thenReturn("encoded_password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User savedUser = authService.register(registerRequest);
+
+        assertTrue(savedUser.getRoles().stream().anyMatch(role -> "BUYER".equals(role.getName())));
+        verify(roleRepository).findByName("BUYER");
+    }
+
+    @Test
+    void testRegisterFailsWhenRoleOutsideBuyerOrSeller() {
+        registerRequest.setRole("ADMIN");
+        when(userRepository.findByEmail(registerRequest.getEmail())).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> authService.register(registerRequest)
+        );
+
+        assertEquals("Role registrasi hanya boleh BUYER atau SELLER", exception.getMessage());
+        verify(roleRepository, never()).findByName(anyString());
         verify(userRepository, never()).save(any(User.class));
     }
 

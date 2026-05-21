@@ -4,17 +4,28 @@ server:
 spring:
   application:
     name: auth-service
+  rabbitmq:
+    host: shark.rmq.cloudamqp.com
+    port: 5672
+    username: ovjyezsx
+    password: 9LJJ7ZDQTDmRydmSXAnb48FSqImyVfP_
+    virtual-host: ovjyezsx
   mail:
-    host: ${MAIL_HOST:}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
+    host: ${SPRING_MAIL_HOST:${MAIL_HOST:}}
+    port: ${SPRING_MAIL_PORT:${MAIL_PORT:587}}
+    username: ${SPRING_MAIL_USERNAME:${MAIL_USERNAME:}}
+    password: ${SPRING_MAIL_PASSWORD:${MAIL_PASSWORD:}}
     properties:
       mail:
         smtp:
-          auth: ${MAIL_SMTP_AUTH:true}
+          auth: ${SPRING_MAIL_SMTP_AUTH:${MAIL_SMTP_AUTH:true}}
           starttls:
-            enable: ${MAIL_SMTP_STARTTLS:true}
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:${MAIL_SMTP_STARTTLS:true}}
+          ssl:
+            enable: ${SPRING_MAIL_SMTP_SSL_ENABLE:${MAIL_SMTP_SSL_ENABLE:false}}
+          connectiontimeout: ${SPRING_MAIL_SMTP_CONNECTION_TIMEOUT:${MAIL_SMTP_CONNECTION_TIMEOUT:5000}}
+          timeout: ${SPRING_MAIL_SMTP_TIMEOUT:${MAIL_SMTP_TIMEOUT:5000}}
+          writetimeout: ${SPRING_MAIL_SMTP_WRITE_TIMEOUT:${MAIL_SMTP_WRITE_TIMEOUT:5000}}
   datasource:
     url: ${SUPABASE_DB_URL:jdbc:h2:mem:testdb}
     username: ${SUPABASE_DB_USERNAME:sa}
@@ -32,8 +43,12 @@ jwt:
 auth:
   email:
     delivery-mode: ${AUTH_EMAIL_DELIVERY_MODE:SMTP}
-    from-address: ${AUTH_EMAIL_FROM:no-reply@bidmart.local}
+    from-address: ${AUTH_EMAIL_FROM:${SPRING_MAIL_USERNAME:${MAIL_USERNAME:no-reply@bidmart.local}}}
     application-name: ${AUTH_EMAIL_APP_NAME:BidMart}
+  internal:
+    service-token: ${AUTH_INTERNAL_SERVICE_TOKEN:bidmart-internal-dev-token}
+  events:
+    retry-delay-ms: ${AUTH_EVENT_RETRY_DELAY_MS:10000}
   session:
     max-concurrent-sessions: ${AUTH_MAX_CONCURRENT_SESSIONS:3}
     expiry-days: ${AUTH_SESSION_EXPIRY_DAYS:7}
