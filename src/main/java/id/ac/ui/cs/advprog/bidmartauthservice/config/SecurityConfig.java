@@ -59,7 +59,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/index.html", "/profile.html").permitAll()
                         .requestMatchers("/dummy/**").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus",
+                                "/actuator/metrics",
+                                "/actuator/metrics/**"
+                        ).permitAll()
                         .requestMatchers("/api/internal/users/**").hasRole("INTERNAL_SERVICE")
                         .requestMatchers(
                                 "/api/auth/register",
