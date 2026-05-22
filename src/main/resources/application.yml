@@ -5,11 +5,18 @@ spring:
   application:
     name: auth-service
   rabbitmq:
-    host: shark.rmq.cloudamqp.com
-    port: 5672
-    username: ovjyezsx
-    password: 9LJJ7ZDQTDmRydmSXAnb48FSqImyVfP_
-    virtual-host: ovjyezsx
+    host: ${SPRING_RABBITMQ_HOST:${RABBITMQ_HOST:raccoon.lmq.cloudamqp.com}}
+    port: ${SPRING_RABBITMQ_PORT:${RABBITMQ_PORT:5672}}
+    username: ${SPRING_RABBITMQ_USERNAME:${RABBITMQ_USERNAME:ucggvrqg}}
+    password: ${SPRING_RABBITMQ_PASSWORD:${RABBITMQ_PASSWORD:itSuldvbbKgDLkKOhEjWpRlstAzaVt.x}}
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:${RABBITMQ_VHOST:ucggvrqg}}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 5000
+          max-attempts: 3
+          max-interval: 30000
   mail:
     host: ${SPRING_MAIL_HOST:${MAIL_HOST:}}
     port: ${SPRING_MAIL_PORT:${MAIL_PORT:587}}
@@ -61,7 +68,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:
@@ -71,6 +78,13 @@ management:
       enabled: false
     rabbit:
       enabled: false
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 staging:
   links:
