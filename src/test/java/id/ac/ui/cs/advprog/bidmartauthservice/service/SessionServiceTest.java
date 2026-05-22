@@ -68,23 +68,52 @@ class SessionServiceTest {
 
     @Test
     void getActiveSessions_UserFound_ReturnsDtoList() {
-        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
-        when(userSessionRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(user.getId()))
-                .thenReturn(List.of(session2, session1));
+        SessionResponseDto dto2 = SessionResponseDto.builder()
+                .id(200L)
+                .sessionTokenId("token-2")
+                .deviceId("device-2")
+                .createdAt(session2.getCreatedAt())
+                .expiresAt(session2.getExpiresAt())
+                .active(true)
+                .build();
+        SessionResponseDto dto1 = SessionResponseDto.builder()
+                .id(100L)
+                .sessionTokenId("token-1")
+                .deviceId("device-1")
+                .createdAt(session1.getCreatedAt())
+                .expiresAt(session1.getExpiresAt())
+                .active(true)
+                .build();
+
+        when(userSessionRepository.findActiveSessionDtosByUserEmailOrderByCreatedAtDesc("test@mail.com"))
+                .thenReturn(List.of(dto2, dto1));
 
         List<SessionResponseDto> dtos = sessionService.getActiveSessions("test@mail.com");
 
         assertThat(dtos).hasSize(2);
         assertThat(dtos.get(0).getId()).isEqualTo(200L);
         assertThat(dtos.get(1).getId()).isEqualTo(100L);
+        verify(userRepository, never()).findByEmail(any());
     }
 
     @Test
     void getActiveSessions_UserNotFound_ThrowsException() {
+        when(userSessionRepository.findActiveSessionDtosByUserEmailOrderByCreatedAtDesc("notfound@mail.com"))
+                .thenReturn(List.of());
         when(userRepository.findByEmail("notfound@mail.com")).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class, () -> sessionService.getActiveSessions("notfound@mail.com"));
-        verify(userSessionRepository, never()).findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(any());
+    }
+
+    @Test
+    void getActiveSessions_UserFoundNoActiveSession_ReturnsEmptyList() {
+        when(userSessionRepository.findActiveSessionDtosByUserEmailOrderByCreatedAtDesc("test@mail.com"))
+                .thenReturn(List.of());
+        when(userRepository.findByEmail("test@mail.com")).thenReturn(Optional.of(user));
+
+        List<SessionResponseDto> dtos = sessionService.getActiveSessions("test@mail.com");
+
+        assertThat(dtos).isEmpty();
     }
 
     @Test

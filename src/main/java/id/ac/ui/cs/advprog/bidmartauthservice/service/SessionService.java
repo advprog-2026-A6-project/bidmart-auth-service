@@ -19,10 +19,13 @@ public class SessionService {
     private final UserSessionRepository userSessionRepository;
 
     public List<SessionResponseDto> getActiveSessions(String email) {
-        User user = findUserByEmail(email);
-        return userSessionRepository.findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(user.getId()).stream()
-                .map(this::toDto)
-                .toList();
+        List<SessionResponseDto> sessions = userSessionRepository.findActiveSessionDtosByUserEmailOrderByCreatedAtDesc(email);
+        if (!sessions.isEmpty()) {
+            return sessions;
+        }
+
+        findUserByEmail(email);
+        return List.of();
     }
 
     public void revokeSession(String email, Long sessionId) {
@@ -41,16 +44,5 @@ public class SessionService {
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User tidak ditemukan"));
-    }
-
-    private SessionResponseDto toDto(UserSession session) {
-        return SessionResponseDto.builder()
-                .id(session.getId())
-                .sessionTokenId(session.getSessionTokenId())
-                .deviceId(session.getDeviceId())
-                .createdAt(session.getCreatedAt())
-                .expiresAt(session.getExpiresAt())
-                .active(session.isActive())
-                .build();
     }
 }

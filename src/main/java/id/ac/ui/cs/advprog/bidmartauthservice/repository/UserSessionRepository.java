@@ -3,6 +3,8 @@ package id.ac.ui.cs.advprog.bidmartauthservice.repository;
 import id.ac.ui.cs.advprog.bidmartauthservice.model.UserSession;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,6 +16,22 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     List<UserSession> findByUserIdAndIsActiveTrueOrderByCreatedAtAsc(Long userId);
 
     List<UserSession> findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(Long userId);
+
+    @Query("""
+            select new id.ac.ui.cs.advprog.bidmartauthservice.dto.SessionResponseDto(
+                s.id,
+                s.sessionTokenId,
+                s.deviceId,
+                s.createdAt,
+                s.expiresAt,
+                s.isActive
+            )
+            from UserSession s
+            where s.user.email = :email
+              and s.isActive = true
+            order by s.createdAt desc
+            """)
+    List<id.ac.ui.cs.advprog.bidmartauthservice.dto.SessionResponseDto> findActiveSessionDtosByUserEmailOrderByCreatedAtDesc(@Param("email") String email);
 
     @EntityGraph(attributePaths = "user")
     Optional<UserSession> findBySessionTokenId(String sessionTokenId);
